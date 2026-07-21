@@ -1,0 +1,294 @@
+
+
+
+windows : 172.18.71.234
+
+
+
+
+root : 管理员
+
+
+linux桌面环境
+	1 在linux下所有的操作都是在终端上运行
+	2 所有设备都是文件的方式体现出来
+	3 所有的文件都是从根(/)开始
+
+如何打开一个终端
+	1 鼠标右键 => 打开终端
+	2 alt + F2 => gnome-terminal
+	3 应用程序 => 系统工具 => 终端
+
+关闭终端：
+	exit
+
+临时有效：
+	如何放大字体：
+		ctrl + shift + +
+	缩小字体
+		ctrl + -
+永久有效：
+	编辑 => 测写首选项 => 设置字体
+
+最大化窗口：
+	alt + F10
+最小化窗口：
+	alt + F9
+窗口之间切换
+	alt + tab
+
+==================================
+一个终端打开多个标签
+	ctrl + shift + t
+
+	标签之间切换
+		alt + num(1,2,3,4,5,...)
+
+====================================
+重启：
+	reboot
+	shutdown -r now
+	init 6
+关机：
+	shutdown -h now
+	init 0
+	poweroff
+=======================================
+查看系统发行版本：
+	[root@www test]# cat /etc/issue
+	Red Hat Enterprise Linux Server release 6.5 (Santiago)
+	Kernel \r on an \m
+
+	[root@www test]# lsb_release -a
+	LSB Version:
+	:base-4.0-ia32:base-4.0-noarch:core-4.0-ia32:core-4.0-noarch:graphics-4.0-ia32:graphics-4.0-noarch:printing-4.0-ia32:printing-4.0-noarch
+	Distributor ID:	RedHatEnterpriseServer
+	Description:	Red Hat Enterprise Linux Server release 6.5 (Santiago)
+	Release:	6.5
+	Codename:	Santiago
+
+
+查看linux内核版本：
+	www.kernel.org
+
+	linux : 是一种类UNIX操作系统，确切说linux是指内核
+
+	[root@www test]# uname -r
+	2.6.32-431.el6.i686
+	
+	2 ： 表示主板本号：
+		系统架构发生很大变化，才会更改
+	6 ： 表示次版本号
+		奇数：测试版本
+		偶数：稳定版本
+	32：修订版本号
+		
+查看系统平台
+	[root@www test]# uname -m
+	i686	表示32位系统
+	x86_64 	表示64位系统
+
+	long
+		32 => 4 => 32 => -2147483648 ~ 2147483647
+		64 => 8 => 64 => -9223372036854775808 ~ 9223372036854775807
+
+查看其他信息
+	[root@www test]# uname -a
+	Linux www.kening.com 2.6.32-431.el6.i686 #1 SMP Sun Nov 10 22:20:22 EST 2013 i686 i686 i386 GNU/Linux
+
+	Linux ： 表示内核
+	www.kening.com :  表示主机名
+	2.6.32-431.el6.i686	： 表示内核版本
+	SMP Sun Nov 10 22:20:22 E    ST 2013 表示第一次发布时间
+	i686 i686 i386	表示32位系统
+	GNU/Linux ： 系统名
+==============================-==
+下载课件：
+	windows :
+		win + r => \\172.18.71.234
+		=> admin
+		=> share
+
+===================================
+linux文件系统详解
+	根文件系统：
+		所有的文件都是从根(/)开始
+	cd / : 表示切换到/目录下
+
+
+	/ : 表示根目录
+		所有的文件都是从根开始
+		所有的设备皆文件
+	boot ： 存放启动的镜像文件
+		vmlinuz-2.6.32-431.el6.i686
+	home	：表示普通用户的家目录
+		/home/username
+	lib 	: 表示库文件存放路径
+		/lib/libc.so.6 ： C库文件
+			
+			.so : 表示动态库
+			.a  : 表示静态库
+
+	mnt ： 默认挂载目录
+		windows共享目录
+		/mnt/hgfs/windows_share_dir_name
+
+	root	: 表示root用户家目录
+		/root/桌面 表示桌面路径
+
+	sys：驱动模块
+	proc： 进程号 虚拟目录
+	sbin	：用于保存管理员指令
+	bin		: 用于保存普通用户指令
+	usr		：用户安装软件目录
+		/usr/include : 表示系统头文件存放目录
+
+	dev		：表示设备类存放目录
+		字符设备：
+		块设备：
+
+	media	：挂载U盘 光盘 硬盘
+		fat	: 文件系统可以识别
+		ntfs：默认不识别
+
+	opt	：扩展包存放目录
+	etc	：配置文件目录
+		
+====================================
+基本命令：
+
+tab:自动补齐
+	1 命令自动补齐
+
+	2 文件自动补齐
+
+	注意：
+		如果输入部分指令或者文件名的时候，按一次tab键没有反映，则可能存在如下情况
+		1> 有多个匹配信息
+		2> 可能指令或者文件输入错误
+		则再按一次tab键
+		如果匹配多个，则说明有多个匹配信息
+		如果依然无响应，则说明输入错误
+
+====================================
+man : 表示帮助
+
+	man手册共有8本
+	1      User Commands		表示普通用户指令说明文档
+	2      System Calls		 	表示系统调用函数接口信息
+	3      C Library Functions	表示C库函数接口信息
+	4      Devices and Special Files	表示设备驱动信息文件
+	5      File Formats and Conventions	表示文件格式说明信息
+	6      Games et. Al.	表示游戏开发相关信息文档
+	7      Miscellanea		表示网络开发说明信息
+	8      System Administration tools and Deamons	表示管理员指令说明信息
+	format :
+		man + number + cmd
+
+	退出：q
+==================================
+deepseek
+
+
+==================================================
+ls: 显示目录下文件或者目录名
+	man ls
+	format 
+		ls + option ... + dirname ...
+
+	option
+		-a : 表示显示所有文件或者目录
+			. 	: 表示当前的工作目录
+			..	: 表示上级目录
+			.filename : 表示隐藏文件
+		-i ： 
+			计算机识别文件唯一标识是文件索引号(inode)
+			如果索引号一致，则表示同一个文件
+
+		-l : 表示长格式显示文件信息
+
+	案例1： 默认
+		ls : 表示显示当前工作目录下文件或者目录名
+
+		当前工作目录：表示当前用户时间操作的目录
+		绝对路径：pwd
+	
+	案例2：-l
+		[root@www test]# ls -l
+		总用量 16
+		-rw-r--r-- 1 root root 3587 5月  20 20:51 1st.txt
+		-rwxr-xr-x 1 root root 4643 5月  20 19:27 a.out
+		-rw-r--r-- 1 root root   89 5月  20 19:27 hello.c
+		按空格分割位7列
+		第一列：表示文件类型和权限
+			文件类型：第一个字符
+				- : 表示普通文件
+				d : 表示目录文件
+				c : 表示字符设备类文件
+				b : 表示块设备类文件
+				l : 表示软链接文件
+				s : 表示套接子文件
+				p : 表示管道文件
+
+			文件权限：第二个字符到第十个字符
+				r : 表示只读
+				w : 表示只写
+				x : 表示可执行
+				- : 表示无权限
+			三位为一组，共三组
+				第一组：表示文件属主的权限
+				第二组：表示文件属组权限
+				第三组：表示其他用户权限
+
+		第二列：表示文件硬链接数
+		第三列：表示文件属主
+			表示文件归那个用户所有
+		第四列：表示文件属组
+			表示文件归那个组所有
+		第五列：表示文件大小
+		第六列：表示时间
+			atime:
+			ctime:
+			mtime:
+		第七列：表示文件名	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

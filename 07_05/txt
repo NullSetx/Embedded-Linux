@@ -1,0 +1,128 @@
+
+
+
+windows : 172.18.71.191
+
+
+VT : 就是对终端简单控制
+
+指针：C语言精华所在
+	难点
+
+定义指针：
+	int *p = NULL;
+
+申请空间
+	malloc => void *
+
+=======================================
+
+//申请空间
+void *malloc(size_t size);
+参数：表示申请空间的大小
+void *calloc(size_t nmemb, size_t size);
+void *realloc(void *ptr, size_t size);
+
+
+释放空间
+void free(void *ptr);
+
+如果不释放，则会导致内存泄漏
+
+
+申请空间和释放的空间要一一对应
+
+
+malloc => mem => heap => 动态内存
+
+32位系统 每一个可执行的程序都占4G的内存空间
+
+3G ~ 4G : sys
+0 ~ 3G	: user
+	地址由高到底划分标准
+		stack	: 局部变量 模块变量 临时变量 调用函数分配空间
+			由高到底的分配
+		heap	: 动态内存 由低到高的分配
+			malloc calloc realloc  => free
+		DS	:	全局变量和静态变量
+			BSS	:未初始化
+			RO	:初始化
+		const	:常量区
+		code	:代码段
+
+============================
+修饰符
+	
+    /*
+	 *static   *****
+	 *auto
+	 *const    ****	
+	 *signed
+	 *unsigned
+	 *extern 
+	 *register ：寄存器   ***
+	 常量的一些变量定义为寄存器变量，为了提高计算机执行效率
+
+	 *volatile : 防止优化 ***
+     */
+	static int a;//stack
+	//
+	//局部变量，位于栈中，程序启动而栈是不会初始化
+	//静态变量，位于数据段(全局区)，程序启动之前就会初始化为0
+	//
+	//静态修饰3个作用
+	//1 修饰局部变量：
+	//	局部只对当前的函数有效
+	//	静态局部变量是对整个函数有效  生存周期
+	//2 修饰全局变量
+	//	全局变量，所有的文件有效
+	//	静态全局变量，只对当前的文件有效
+	//3 修饰函数
+	//	函数是所有的文件都可以调用
+	//	静态函数只能本文件中的函数可以调用
+	//
+=======================================
+指针作为函数参数
+	void * 可以接受任意类型的指针	
+
+===============================
+指针和数组关系
+	一级指针完全等价一维数组
+
+返回：
+	不可以返回作用域在本函数内部且非静态变量的局部变量的地址
+
+=================================
+str家族函数
+	
+	homework1: shift + v => =
+		char *strcpy(char *dest, const char *src);
+		char *strncpy(char *dest, const char *src, size_t n);
+		char *strcat(char *dest, const char *src);
+		char *strncat(char *dest, const char *src, size_t n);
+		int strcmp(const char *s1, const char *s2);
+		int strncmp(const char *s1, const char *s2, size_t n);
+		char *strchr(const char *s, int c);
+		char *strrchr(const char *s, int c);
+		char *strstr(const char *haystack, const char *needle);
+		char *strcasestr(const char *haystack, const char *needle);
+
+	homework2:
+		实现动态数组 (int) => malloc
+
+	homework3:
+		输入字符串，统计单词个数  删除空格
+		"    hell o     world    " =》 "helloworld"
+
+
+void *calloc(size_t nmemb, size_t size);
+	第一个参数：表示数据个数
+	第二个参数：表示数据类型
+
+
+
+
+
+
+
+

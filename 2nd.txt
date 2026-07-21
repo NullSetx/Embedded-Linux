@@ -1,0 +1,478 @@
+
+windows : 172.18.71.234
+
+=====================================
+基本命令
+	
+ls: 显示目录下文件或者目录名
+	man ls
+	format 
+		ls + option ... + dirname ...
+
+	option
+		-a : 表示显示所有文件或者目录
+			. 	: 表示当前的工作目录
+			..	: 表示上级目录
+			.filename : 表示隐藏文件
+		-i ： 
+			计算机识别文件唯一标识是文件索引号(inode)
+			如果索引号一致，则表示同一个文件
+
+		-l : 表示长格式显示文件信息
+
+	案例1： 默认
+		ls : 表示显示当前工作目录下文件或者目录名
+
+		当前工作目录：表示当前用户时间操作的目录
+		绝对路径：pwd
+	
+	案例2：-l
+		[root@www test]# ls -l
+		总用量 16
+		-rw-r--r-- 1 root root 3587 5月  20 20:51 1st.txt
+		-rwxr-xr-x 1 root root 4643 5月  20 19:27 a.out
+		-rw-r--r-- 1 root root   89 5月  20 19:27 hello.c
+		按空格分割位7列
+		第一列：表示文件类型和权限
+			文件类型：第一个字符
+				- : 表示普通文件
+				d : 表示目录文件
+				c : 表示字符设备类文件
+				b : 表示块设备类文件
+				l : 表示软链接文件
+				s : 表示套接子文件
+				p : 表示管道文件
+
+			文件权限：第二个字符到第十个字符
+				r : 表示只读 => 4
+				w : 表示只写 => 2
+				x : 表示可执行 => 1
+				- : 表示无权限 => 0
+				数字表示方式：
+					rwx => 7
+					rw- => 6
+					r-x => 5
+					r-- => 4
+					-wx => 3
+					-w- => 2
+					--x => 1
+					--- => 0
+				属主：u
+				属组：g
+				其他用户：o
+				所有用户：a
+			文件指定权限：chmod
+			案例1：属主添加可执行权限
+				[root@www test]# chmod u+x hello.c 
+				[root@www test]# ll hello.c 
+				-rwxr--r-- 2 root root 89 5月  20 19:27 hello.c
+			案例2：删除属组r权限
+				[root@www test]# ll hello.c 
+				-rwxr--r-- 2 root root 89 5月  20 19:27 hello.c
+				[root@www test]# chmod g-r hello.c 
+				[root@www test]# ll hello.c 
+				-rwx---r-- 2 root root 89 5月  20 19:27 hello.c
+			案例3：指定其他用户拥有可读额可执行权限
+				[root@www test]# ll hello.c 
+				-rwx---r-- 2 root root 89 5月  20 19:27 hello.c
+				[root@www test]# chmod o=rx hello.c 
+				[root@www test]# ll hello.c 
+				-rwx---r-x 2 root root 89 5月  20 19:27 hello.c
+			案例4：所有用户指定可读可写权限
+				[root@www test]# ll hello.c 
+				-rwx---r-x 2 root root 89 5月  20 19:27 hello.c
+				[root@www test]# chmod a=rw hello.c 
+				[root@www test]# ll hello.c 
+				-rw-rw-rw- 2 root root 89 5月  20 19:27 hello.c
+
+			案例5：属主rwx,属组rx,其他用户r权限
+				[root@www test]# ll hello.c 
+				-rw-rw-rw- 2 root root 89 5月  20 19:27 hello.c
+				[root@www test]# chmod u=rwx,g=rx,o=r hello.c 
+				[root@www test]# ll hello.c 
+				-rwxr-xr-- 2 root root 89 5月  20 19:27 hello.c
+
+			案例5：数字指定权限方式
+				[root@www test]# ll hello.c 
+				-rwx------ 2 root root 89 5月  20 19:27 hello.c
+				[root@www test]# chmod 754 hello.c 
+				[root@www test]# ll hello.c 
+				-rwxr-xr-- 2 root root 89 5月  20 19:27 hello.c
+
+			创建用户：
+				useradd username
+				案例：
+				[root@www test]# useradd jim	创建jim用户
+				[root@www test]# useradd mary	创建mary用户
+				[root@www test]# id jim		查看用户uid
+				uid=500(jim) gid=506(jim) 组=506(jim)
+				[root@www test]# id mary
+				uid=501(mary) gid=501(mary) 组=501(mary)
+
+			修改文件属主和属组：chown
+			案例1：修改文件属主
+				[root@www test]# ll hello.c 
+				-rwxr-xr-- 2 root root 89 5月  20 19:27 hello.c
+				[root@www test]# chown jim hello.c 
+				[root@www test]# ll hello.c 
+				-rwxr-xr-- 2 jim root 89 5月  20 19:27 hello.c
+				[root@www test]# 
+			案例2：修改文件属组
+				[root@www test]# chown :mary hello.c 
+				[root@www test]# ll hello.c 
+				-rwxr-xr-- 2 jim mary 89 5月  20 19:27 hello.c
+				[root@www test]# 
+
+				
+
+			三位为一组，共三组
+				第一组：表示文件属主的权限
+				第二组：表示文件属组权限
+				第三组：表示其他用户权限
+
+		第二列：表示文件硬链接数
+			硬链接：
+				创建硬链接
+					ln srcfilename destfilename
+					1 硬链接相当于给文件做个备份
+					2 硬链接文件索引号是一致的
+					3 硬链接不可以操作目录
+			软链接：
+				创建软链接文件
+					ln -s srcfilename destfilename
+					1 软链接相当于给文件创建快捷方式
+					2 软链接文件索引号不一致
+					3 软链接可以操作目录
+
+			软链接：
+		第三列：表示文件属主
+			表示文件归那个用户所有
+		第四列：表示文件属组
+			表示文件归那个组所有
+		第五列：表示文件大小
+			单位默认是字节
+			-h : 表示易读方式显示文件大小
+			1 byte = 8 bit
+			1 K = 1024 byte
+
+		第六列：表示时间 mtime
+			atime: 访问时间
+			ctime: 修改时间（属性 chmod chown）
+			mtime: 修改时间 (文件内容)
+				修改文内容会触发ctime时间
+
+		第七列：表示文件名	
+
+====================================================
+cd : 切换工作目录
+	format:
+		cd + dirname
+
+	
+	目录路径分两种：
+		绝对路径：就是从/开始
+		相对路径：就是当前工作目录开始
+
+	特殊路径表示方式：
+		.	表示当前工作目录
+		..	表示上级目录
+		~	表示当前用户家目录
+			root : /root
+			other_username	: /home/username
+		-	表示上次目录所处的工作路径
+
+	案例1：从当前工作目录切换到/
+		当前工作目录：
+			[root@www bb]# pwd
+			/test/aa/bb
+		绝对路径：
+			[root@www bb]# cd /
+			[root@www /]# pwd
+			/
+
+		相对路径：
+			[root@www bb]# cd ../../..
+			[root@www /]# pwd
+			/
+	案例2：从当前工作目录切换到上级目录下
+		当前工作目录
+			[root@www bb]# pwd
+			/test/aa/bb
+		绝对路径：
+			[root@www bb]# cd /test/aa
+			[root@www aa]# pwd
+			/test/aa
+
+		相对路径：
+			[root@www bb]# pwd
+			/test/aa/bb
+			[root@www bb]# cd ..
+			[root@www aa]# pwd
+			/test/aa		
+
+pwd : 查看当前工作目录的绝对路径
+	
+
+=========================================
+touch : 创建文件
+	format : touch + filename
+	案例1：
+		touch a.txt
+
+	案例2：
+		touch filename1 filename2 ... filenamen
+
+rm : 表示删除文件
+	-f : 表示无需确认删除
+	-r : 表示删除目录
+
+	注意：
+		[root@www /]# pwd
+		/
+		[root@www /]# rm * -rf !!!!!!!!!!!!!!!!
+		
+		cd / && rm * -rf !!!!!!!!!!!!!!!!!!!!
+
+		rm /* -rf !!!!!!!!!!!!!!!!!!!!!!
+
+	通配符：
+		* : 表示任意多个字符
+		? : 表示任意一个字符
+
+================================
+mkdir : 创建目录
+
+	练习：
+		mkdir /test/aa/bb/cc/dd
+		表示递归的方式创建目录
+		[root@www aa]# mkdir -p /test/aa/bb/cc/dd/ff
+		[root@www aa]# tree 以树的结构显示目录状态
+		.
+		└── bb
+		    └── cc
+			    └── dd
+					└── ff
+
+rmdir : 删除空目录
+	rm dirname -rf
+
+========================================
+cp : 复制文件或者目录
+	format : cp option srcfile destfile
+	 option :
+	 	-r : 表示复制目录
+
+	案例1：复制
+		[root@www aa]# ls
+		a.txt
+		[root@www aa]# cat a.txt 
+		hello
+		[root@www aa]# cp a.txt b.txt
+		[root@www aa]# ls
+		a.txt  b.txt
+		[root@www aa]# cat a.txt 
+		hello
+	案例2：如果目标文件存在，无需用户确认复制
+		[root@www aa]# /bin/cp a.txt b.txt	表示执行真正的cp 
+		[root@www aa]# /bin/cp a.txt b.txt 
+		[root@www aa]# \cp a.txt b.txt 		表示转义执行真正的cp
+		[root@www aa]# \cp a.txt b.txt 
+	案例3： 复制目录
+		[root@www aa]# ls
+		aa  a.txt  b.txt
+		[root@www aa]# cp aa bb -r
+		[root@www aa]# tree
+		.
+		├── aa
+		│   └── hello.c
+		├── a.txt
+		├── bb
+		│   └── hello.c
+		└── b.txt
+
+	练习：把当前目录下所有的.c文件一次性复制到/tmp下
+		[root@www aa]# ls /tmp/
+		[root@www aa]# ls 
+		1.c  aa  aa.c  a.txt  bb  b.txt  hello.c  test.c
+		[root@www aa]# cp *.c /tmp
+		[root@www aa]# ls /tmp/
+		1.c  aa.c  hello.c  test.c
+========================================================
+mv : 改名或者移动
+	案例1：改名
+		[root@www aa]# ls
+		a.txt  b.txt
+		[root@www aa]# mv a.txt c.txt
+		[root@www aa]# ls
+		b.txt  c.txt
+	案例2：移动
+		[root@www aa]# ls /tmp/
+		1.c  aa.c  hello.c  test.c
+		[root@www aa]# ls
+		b.txt  c.txt
+		[root@www aa]# mv b.txt /tmp/
+		[root@www aa]# ls
+		c.txt
+		[root@www aa]# ls /tmp/
+		1.c  aa.c  b.txt  hello.c  test.c
+	案例3：移动并改名
+		[root@www aa]# ls
+		c.txt
+		[root@www aa]# ls /tmp/
+		1.c  aa.c  b.txt  hello.c  test.c
+		[root@www aa]# mv c.txt /tmp/cccc.txt
+		[root@www aa]# ls /tmp/
+		1.c  aa.c  b.txt  cccc.txt  hello.c  test.c
+		[root@www aa]# ls
+		[root@www aa]# 
+==============================================
+cat : 查看文件内容
+	format:
+		cat + option + filename
+		
+	案例：
+		cat -n passwd	显示行号查看
+		cat -E passwd	显示特殊字符
+more : 分屏显示文件内容
+	向后滚动的查看 => entern
+	
+	q : 退出
+
+less : 分屏显示
+	上下滚动查看 => 方向键
+
+	q : 退出
+
+head : 查看前面行
+	head filename : 默认查看前面10行
+	
+	head -n 3 passwd 查看前面3行
+
+tail : 查看后面行
+	tail filename : 默认查看后面10行
+	tail -n 2 passwd : 查看后面2行
+
+===============================================
+特殊文件（设备）
+								文件指针    文件描述符
+	输入设备：键盘 鼠标			stdin		0
+	输出设备：显示器 打印机		stdout		1
+	错误输出：显示器 打印机		stderr		2
+
+重定向：
+	输出重定向：
+		清空正确输出重定向：>
+			案例：
+				[root@www aa]# echo hello	默认输出到显示器
+				hello
+				[root@www aa]# echo hello > a.txt
+				改变输出方向，输出到文件中
+				[root@www aa]# cat a.txt 
+				hello
+
+
+		清空错误输出冲定先： 2>
+			案例：
+				[root@www aa]# ls /lkhsghkd 2> a.txt 
+				[root@www aa]# cat a.txt 
+				ls: 无法访问/lkhsghkd: 没有那个文件或目录
+
+		追加方式正确输出重定向：>>
+			案例：
+				[root@www aa]# cat a.txt 
+				hello
+				[root@www aa]# echo hello >> a.txt 
+				[root@www aa]# echo hello >> a.txt 
+				[root@www aa]# echo hello >> a.txt 
+				[root@www aa]# cat a.txt 
+				hello
+				hello
+				hello
+				hello
+
+		追加错误输出：2>>
+
+
+		黑洞文件：
+			/dev/null
+			案例：表示垃圾信息输出到黑洞文件中，且不占用磁盘空间
+				ping 192.168.2.254 > /dev/null
+
+	输入重定向： <
+		案例： 通过键盘输入修改jim用户密码
+			[root@www aa]# passwd jim
+			更改用户 jim 的密码 。
+			新的 密码：					等待用户输入
+			无效的密码： 过于简单化/系统化
+			无效的密码： 过于简单
+			重新输入新的 密码：
+			passwd： 所有的身份验证令牌已经成功更新。
+		
+		改变输入方向，从文件中获取
+			[root@www aa]# passwd jim < ./a.txt 
+			更改用户 jim 的密码 。
+			新的 密码：无效的密码： 过于简单化/系统化
+			无效的密码： 过于简单
+			重新输入新的 密码：passwd： 所有的身份验证令牌已经成功更新。
+
+	<< : 表示结束标记
+		案例：
+			[root@www aa]# cat << AAA
+			> hello
+			> world
+			> this is my teacher
+			> AAA		会把用户通过键盘输出显示到终端
+			hello
+			world
+			this is my teacher
+
+================================================================			
+
+
+
+		
+
+
+
+
+		
+
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,115 @@
+
+
+
+数组：
+	就是同一种数据元素的集合
+
+定义：
+	arr_type arr_name[index] = {value1, value2, ...};
+	
+	char short int long float double  long double
+
+	index : 表示数组的成员个数,且必须是常量
+			表示数组的空间大小
+
+
+练习：定义10个数据元素的数组，并随机100以内数据赋值
+	求和 
+
+
+特性：
+	1 数组每一个数据元素都是同一种类型
+	2 数组不可以越界访问
+	3 数组空间地址是连续的
+	
+数组作为函数参数：
+	数组作为函数参数变成指针
+	数组作为函数参数：至少要传递两个参数
+		第一个：数组名
+		第二个：数组空间大小或者数组个数
+
+
+
+
+===================
+kening114  =>  20250706$
+
+192.168.43.17
+
+
+========================
+字符串数组：
+	
+	多一种初始化方法：""
+	多一种遍历方法  : %s
+
+	注意：
+		字符串的结束标记是尾零 0 or '\0'
+
+	
+外部接受字符串：
+	char *fgets(char *s, int size, FILE *stream);
+	第一个参数：表示存储数据空间地址
+	第二个参数：表述空间大小
+	第三个参数：文件指针 stdin 表示键盘 
+
+
+======================================
+homework1:
+	char s1[128] = "hello" char s2[128] = "world";
+
+	实现把一个字符串中的数据赋值给另一个字符串 
+		void str_copy(char dest[], char src[])
+		void str_copy_num(char dest[], char src[], int num);
+
+	连接
+		void str_cat(char dest[], char src[]);
+		void str_cat_num(char dest[], char src[], int num);
+
+	比较
+		int str_cmp(char s1[], char s2[]);
+		int str_cmp_num(char s1[], char s2[], int num);
+		//> 1 < -1 == 0
+		s1 => "make"
+		s2 => "mask"
+	查找
+		int str_chr_first(char s[], char ch);
+		"hello" 'l' => 返回找到字符的小标  如果没有找到则返回-1
+		int str_chr_end(char s[], char ch);
+============================================================
+homework2:
+	求第二大数
+	int arr[10] = {9, 5, 3, 9, 1, 8, 5, 4, 3, 9};
+	重复的数据不统计
+
+homework3:
+	实现加法bc : 超文本计算器
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

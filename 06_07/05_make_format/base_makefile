@@ -1,0 +1,17 @@
+
+#AA = 123
+AA ?= 456
+
+
+BB = hello${AA}
+
+all:
+	@echo all
+	echo "this is all rule"
+	echo ===================
+	echo ${AA}
+	echo $(AA)
+	echo ${BB}
+	echo ===================
+123:
+	echo "123"

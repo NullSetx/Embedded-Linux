@@ -1,0 +1,65 @@
+
+windows : 172.18.70.8
+
+
+
+
+
+man string:
+	拷贝
+	char *strcpy(char *dest, const char *src)
+	char *strncpy(char *dest, const char *src, size_t n);
+	连接：
+	char *strcat(char *dest, const char *src);
+	char *strncat(char *dest, const char *src, size_t n);
+	比较：
+	int strcmp(const char *s1, const char *s2);
+	int strncmp(const char *s1, const char *s2, size_t n);
+	查找匹配字符
+	char *strchr(const char *s, int c);//从前到后查找
+	char *strrchr(const char *s, int c);//从后到前查找
+
+
+=====================================
+	查找匹配的字符串
+	char *strstr(const char *haystack, const char *needle);
+	char *strcasestr(const char *haystack, const char *needle); 表示不区分大小写查找
+
+=========================================
+内存家族函数
+	void *memcpy(void *dest, const void *src, size_t n);
+	第一个参数：表示目标空间地址
+	第二个参数：表示源空间地址
+	第三个参数：空间大小
+
+移动：
+	void *memmove(void *dest, const void *src, size_t n);
+
+
+	如果源和目标的内存空间不重叠，则memcpy和memmove效果是一样的
+	如果源和目标的内存空间重叠，切忌一定使用的是memmove
+
+清空函数
+	void *memset(void *s, int c, size_t n);
+
+================================================	
+二维数组：
+	type name[const][const] = {}
+
+
+========================================
+homework1:
+	接受一个字符串数字 转换成整形数据
+	"123" => 123
+
+homework2:
+	bc 超文本计算器
+		char s1[1024] = "111111111111111111111111111111111"
+		char s2[1024] = "333333333333333333333333"
+		char s3[1024] = {}
+homework3:
+	实现约瑟夫环
+		m个人围成圈，报到n的人退出
+		char name[10][64] = {"tom", "zhang san"}
+
+

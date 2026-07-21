@@ -1,0 +1,237 @@
+
+windows : 172.18.70.8
+
+makefile :
+	作用：多文件编译
+	是一门规则性的语言
+	format:
+		rule_name:依赖
+		(tab)cmd
+
+	定义规则根定义变量名一样，甚至数字都可以做规则名
+	
+	makefile文件命名一般把第一个字母大写：Makefile
+
+实现makefile开发流程
+	1 创建makefile文件
+		touch Makefile
+	2 实现：
+		all:
+			echo all
+		123:
+			echo hello
+	3 执行
+		注意：执行第一个规则名的时候，可以直接敲make or make all
+			如果执行其他规则，则一定要添加规则名 make 123
+
+============================
+make 命名：
+	touch Makefile or makefile
+
+	如果makefile文件是其他命名方式，则在运行的时候需指定文件名
+		make -f filename
+		案例：
+			[root@www 05_make_format]# mv Makefile 11
+			[root@www 05_make_format]# ls
+			11
+			[root@www 05_make_format]# make
+			make: *** 没有指明目标并且找不到 makefile。 停止。
+			[root@www 05_make_format]# make -f 11  指定执行makefile文件
+			all
+			echo "this is all rule"
+			this is all rule
+			[root@www 05_make_format]# make -f 11 123  指定执行其规则名
+			echo "123"
+			123
+			[root@www 05_make_format]# 
+
+参数：-s : 表示不显示执行的命令，只显示执行的结果
+=======================================
+变量：
+	makefile变量一般是大写
+	format:
+		valname = value
+
+取值：
+	${valname} or $(valname)
+
+
+赋值方式：
+	=	:	表示替换原来的数据
+	+=	:	表示连接
+	:=	:	表示如果取另一个变量的值给当前的变量，如果另一个变量定义在当前变量的前面，则可以取出其值给当前的变量；如果定义到当前变量的后面，则不可以取出其值。
+
+	?=	:	表示判断前面是否定义变量，如果未定义则赋值成功，如果定义，则赋值失败
+
+==================================
+依赖关系： 规则名依赖
+	在执行当前规则的时候，先执行依赖
+
+什么可以作为依赖：
+	1> 规则名
+	2> 文件名
+	3> 变量
+
+	如果规则名和文件名同名，优先执行规则名，则需要Makefile文件中添加如下一段伪指令
+		.PHONY:rule_name
+
+自动变量：
+	$@ : 表示规则名
+	$^ : 表示所有的依赖 如果重复出现依赖，则取依次
+	$+ : 表示所有的依赖 
+	$< : 表示第一个依赖
+
+
+
+==================================
+一个源文件生成二进制可执行文件分四部：
+	1 预处理 .i
+		就是处理头文件 宏命令 条件编译 特殊字符
+			头文件：
+				头文件
+				宏命令
+				条件编译
+				函数声明
+				全局变量
+				抽象数据类型
+			头文件包含方式有两种： 面试
+				<> :  表示从系统头文件(/usr/include)的目录中查找
+				"" :  表示从当前工作目录中查找，如果当前工作目录中没有，则从系统头文件的目录中查找
+
+			包含头文件的时候可能存在重复性的包含？
+			format:
+				#ifndef __KEN_FILE_H__
+				#define __KEN_FILE_H__
+
+
+				#endif //FILE_H
+
+		gcc -E file.c -o file.i
+	2 编译:就是检查语言的语法错误或者词法规则
+		gcc -S file.i -o file.s
+		
+	3 汇编
+		就是把汇编代码生成二进制代码（目标代码）
+		gcc -c file.s -o file.o
+	4 链接：链接库文件 .so .a
+		把目录代码生成二进制可执行代码
+		gcc *.o -o exe
+========================================================
+系统库文件存放路径：
+	/lib
+
+库文件：
+	动态库：.so
+		1 获取所有的.o文件
+			gcc -c filename.c -o filename.o
+
+		2 生成共态共享库
+			format : lib + name + .so
+			案例：
+				gcc -shared -fPIC -o libmyhello.so hello.o world.o test.o
+
+				-shared : 表示生成的是动态共享库
+				-fPIC	: 表示生成的库与源码位置无关
+
+				注意：
+					64位系统,则-fPIC再生成.o文件的时候需要添加
+		3 编译：
+			gcc main.c -I . -L . -lmyhello -o hello
+
+			-I ：表示指定头文件存放的路径
+			-L : 表示指定库文件存放的路径
+			-l : 表示指定连接的库名
+
+		4 执行：
+			[root@www 10_lib]# ./hello 
+			./hello: error while loading shared libraries: libmyhello.so: cannot open shared object file: No such file or directory
+
+			原因：是否需要保存到系统库文件目录中/lib
+			案例：
+				[root@www 10_lib]# ls
+				func.h  hello.c  libmyhello.so  Makefile  test.o   world.o
+				hello   hello.o  main.c         test.c    world.c
+				[root@www 10_lib]# mv libmyhello.so /lib/ 表示把当前工作目录下库文件移动到/lib
+				[root@www 10_lib]# ls
+				func.h  hello.c  main.c    test.c  world.c
+				hello   hello.o  Makefile  test.o  world.o
+				[root@www 10_lib]# ./hello  则可以执行
+				main start ...
+				this is hello!
+				this is world!
+				this is test!
+				main end ...
+
+			解决方式二：库文件存放当前工作目录依然生效
+				则需要配置库配置文件
+				vim /etc/ld.so.conf
+				添加库的存放路径到文件中
+				案例：/79_lg/C/2026-06-07/10_lib
+
+				配置文件生效
+				ldconfig
+	静态库：.a
+		1 获取.o文件
+			gcc -c filename 
+
+		2 生成静态库
+			format : lib + name + .a
+
+			案例：
+				ar -cr libmyworld.a hello.o world.o test.o
+				
+				-c : 表示创建静态库
+				-r : 表示把模块添加到库中
+
+		3 编译
+			gcc main.c -L . -lmyworld -o world
+
+		4 执行
+			./world
+
+
+动态库和静态库区别：
+	1 动态库是在运行的时候加载
+	  静态库是在编译的时候加载
+
+	2 动态库比静态库空间效率高
+	  静态库比动态库执行效率高
+
+	3 优先级
+		验证静态库和动态库谁的优先级高？？？
+
+		动态库优先级高于静态库
+
+
+==================================
+实现date
+	time(NULL) : 1970年1月1日0点0分0秒 => now 总秒数
+
+	1970 1 1 =》星期四
+
+	统计那一年 year.c
+	统计那一月 month.c
+	统计那一天 
+	统一星期
+	
+	file => Makefile  <= lib .so .a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

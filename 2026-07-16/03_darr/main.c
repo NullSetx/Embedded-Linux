@@ -1,0 +1,237 @@
+#include "darr.h"
+
+
+#define MAX 10
+
+//学生结构体为例
+
+struct cls_t{
+	char name[64];
+	int id;
+	int age;
+	char sex;
+	float lin;
+	float c;
+	float sum;
+};
+
+
+void ls(const void *data)
+{
+	struct cls_t *cls = (struct cls_t *)data;
+	printf("name : %s id : %d age : %d sex : %c lin : %.2f c : %.2f sun : %.2f\n", cls->name, cls->id, cls->age, cls->sex, cls->lin, cls->c, cls->sum);
+
+}
+
+void ls_int(const void *data)
+{
+	printf("%d ", *(int *)data);
+}
+
+
+//==============cmp=============
+//0 => 相等  >0  <0
+int cmp_name(const void *d1, const void *d2)
+{
+	return strcmp(((struct cls_t *)d1)->name, (char *)d2);
+}
+
+int cmp_id(const void *d1, const void *d2)
+{
+	return ((struct cls_t *)d1)->id - *((int *)d2);
+}
+
+int cmp_age(const void *d1, const void *d2)
+{
+	return ((struct cls_t *)d1)->age - *((int *)d2);
+}
+
+int cmp_sex(const void *d1, const void *d2)
+{
+	return ((struct cls_t *)d1)->sex - *((char *)d2);
+}
+int cmp_lin(const void *d1, const void *d2)
+{
+	return ((struct cls_t *)d1)->lin - *((float *)d2);
+}
+int cmp_c(const void *d1, const void *d2)
+{
+	return ((struct cls_t *)d1)->c - *((float *)d2);
+}
+int cmp_sum(const void *d1, const void *d2)
+{
+	float f;
+
+	f = ((struct cls_t *)d1)->sum - *((float *)d2);
+	/*printf("f : %f\n", f);*/
+	//0.000534
+	if (f > -0.005 && f < 0.005)
+		return 0;
+	else if (f > 0.00001)
+		return 1;
+	else
+		return -1;
+		
+}
+
+//============mod=================================
+void mod_age(void *d1, const void *d2)
+{
+	((struct cls_t *)d1)->age = *(int *)d2;
+}
+
+void mod_name(void *d1, const void *d2)
+{
+	strcpy(((struct cls_t *)d1)->name,  (char *)d2);
+}
+
+//===========sort=============================
+int sort_sum(const void *d1, const void *d2)
+{
+	float f;
+
+	f = ((struct cls_t *)d1)->sum - ((struct cls_t *)d2)->sum;
+	/*printf("f : %f\n", f);*/
+	//0.000534
+	if (f > -0.005 && f < 0.005)
+		return 0;
+	else if (f > 0.00001)
+		return 1;
+	else
+		return -1;
+		
+}
+int main(int argc, char *argv[])
+{
+	int i;
+	int count = 0;//统计数据个数
+	struct cls_t cls;		//临时接受用户输入
+	struct cls_t stu = {"tom", 100086, 20, 'M', 88.99, 99.88, 88.99 + 99.88};
+	struct cls_t *pc = NULL;
+
+	DARR *handle = NULL;
+
+	int index;
+	char name[64];
+	int id;
+	char sex;
+	int age;
+	float lin;
+
+	if (argc == 2)
+	{
+		printf("load cls info :\n");
+		handle = darr_load("./stu.db");
+		
+		darr_travel(handle, ls);
+		return 1;
+	}
+
+	handle = darr_creat(sizeof(struct cls_t));
+	ERRP(NULL == handle, darr_creat, goto ERR1);
+
+	//循环接受用户输入
+	for (i = 0; i < MAX; i++)
+	{
+		
+		snprintf(cls.name, sizeof(cls.name), "cls_%c%c", rand() % 26 + 'A', rand() % 26 + 'a');
+		cls.id = 1122000 + rand() % 1000;
+		cls.age = rand() % 3 + 17;
+		cls.sex = "MF"[rand() % 2];
+		cls.lin = 30.0 * (rand() / (RAND_MAX + 1.0)) + 70;
+		cls.c = 20.0 * (rand() / (RAND_MAX + 1.0)) + 80;
+		cls.sum = cls.lin + cls.c;
+		
+		//添加数据到handle
+		/*darr_insert_end(handle, &cls);*/
+		darr_insert_front(handle, &cls);
+
+	}
+
+	printf("=================\n");
+
+	//遍历 handle->data
+	darr_travel(handle, ls);
+	printf("=================\n");
+	darr_sort_ascending(handle, sort_sum);
+	darr_travel(handle, ls);
+
+	darr_store(handle, "./stu.db");
+	printf("sizeof(struct cls_t) : %d\n", sizeof(struct cls_t));
+
+	
+	/*GETLINES("input find name : ", name);*/
+	/*sex = 'M';*/
+    /*
+	 *printf("please input find sum score : ");
+	 *scanf("%f", &lin);
+	 *pc = darr_find_front(handle, &lin, cmp_sum);
+	 *if (pc == NULL)
+	 *{
+	 *    printf("no find!\n");
+	 *}
+	 *else
+	 *{
+	 *    ls(pc);
+	 *}
+     */
+	#if 0
+	/*GETLINES("input mod name : ", name);*/
+	printf("input mod id : ");
+	scanf("%d", &id);
+	getchar();
+	GETLINES("input mod name : ", name);
+    /*
+	 *printf("input age : ");
+	 *scanf("%d", &age);
+     */
+	darr_mod_front(handle, &id, cmp_id, name, mod_name);
+	/*darr_mod_front(handle, &id, cmp_name, &age, mod_age);*/
+	/*darr_mod_front(handle, name, cmp_name, &age, mod_age);*/
+	darr_travel(handle, ls);
+
+
+
+
+    /*
+	 *printf("input find age : ");
+	 *scanf("%d", &age);
+	 *darr_travel(darr_find_all(handle, &age, cmp_age), ls);
+     */
+    /*
+	 *darr_del_all(handle, &sex, cmp_sex);
+	 *darr_travel(handle, ls);
+     */
+
+	
+/*
+ *    GETLINES("input del cls name : ", name);
+ *
+ *    darr_del_front(handle, name, cmp_name);
+ */
+#if 0
+	printf("input del cls index : ");
+	scanf("%d", &index);
+	/*darr_del_end(handle, &id, cmp_age);*/
+	darr_del_index(handle, index);
+	
+	/*darr_del_front(handle, &id, cmp_id);*/
+	darr_travel(handle, ls);
+#endif
+
+    /*
+	 *printf("input index : ");
+	 *scanf("%d", &index);
+	 *darr_insert_index(handle, &stu, index);
+	 *darr_travel(handle, ls);
+     */
+
+
+	//释放内存空间 销毁
+	/*free(new);*/
+	#endif	
+	darr_destroy(&handle);
+	return 0;
+ERR1:
+	return -1;
+}

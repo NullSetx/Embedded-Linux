@@ -1,0 +1,66 @@
+
+file IO : 文本文件读取和写入
+
+	读取： 数据从文件中加载到内存中
+	写入： 把数据从内存中写入文件中
+
+	打开文件：fopen
+	关闭文件：fclose
+
+按字符的读和写：
+	fgetc fputc
+按行的读和写
+	fgets fputs
+按buf：
+	fread fwrite
+按格式：
+	fprintf fscanf
+偏移：
+	fseek
+	ftell
+	rewind
+=================================
+容错函数
+	void perror(const char *s);  提示信息
+
+全局错误号
+	int errno;
+
+	 char *strerror(int errnum);
+========================================
+数据结构
+	顺序表：动态数组
+
+	=> int => char => struct => package => void
+
+	=> count size data => abs => struct 
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,258 @@
+
+
+windows : 172.18.71.234
+
+ls -l
+chmod 
+chown
+useradd
+passwd 
+stat
+	atime:
+		cat more less head tail
+	ctime:
+		vim 
+	mtime:
+		chmod chown
+
+cd  pwd
+
+touch rm mkdir rmdir
+cp mv
+output :
+	> 2> >> 2>> &> &>>
+	/dev/null
+input:
+	<
+
+================================================
+vim : 编辑器 程序开发器
+gcc : 编译器 就是把源代码翻译成二进制可执行代码
+
+案例：实现C语言的开发流程
+	1 创建.c的源文件
+		touch hello.c
+	2 编辑.c文件
+		vim hello.c
+
+		i => write code => ESC键 => :wq => entern
+	3 编译.c文件
+		gcc hello.c
+	4 执行
+		./a.out
+
+
+=======================================
+vim :
+三种模式：
+	一般模式：就是vim直接打开文件的一种模式
+	编辑模式：就是在文件左下角有插入字样
+	命令行模式：就是在文件左下角有:字样
+模式之间如何切换：
+	一般模式切换到编辑模式：
+		i I o O a A s S
+	编辑模式切换到命令行模式：
+		ESC键 => :cmd
+		:wq	表示保存并退出
+		:w	表示保存
+		:q  表示退出
+================================
+一般模式操作：
+	删除：
+		dd	: 删除一行
+		u	: 撤销上次操作
+		ndd	: 表示删除n行
+
+		dw	: 删除一个单词（光标首字母处）
+		daw	: 删除一个单词(光标在单词任意位置)
+		ndw	: 删除n个单词
+
+		d$	: 从光标位置删除到行尾
+		d^	: 从光标位置删除到行首
+		dG	: 从光标所在行删除到文件结尾
+		dgg	: 从光标所在行删除到文件开头
+
+	复制：
+		yy	: 复制一行
+		p	: 粘贴
+		nyy	: 复制n行
+	可视化操作：
+		可视化字符：
+			v => 方向键 => y  => p
+		可视化行：
+			shift + v => 方向键 => y => p
+		可视化块：
+			ctrl + v => 方向键 => y => p
+		
+	移动：
+		上移：k
+		下移：j
+		左移：h
+		右移：l
+
+		行尾：$
+		行首：^
+		文件开头：gg
+		文件结尾：G
+		屏幕顶部：H
+		屏幕底部：L
+		屏幕中间：M
+		文件中间：50%
+		第n行	：ngg
+
+	可视化行移动
+		选中 shift + v => 移动行
+		左移：shift + <
+		右移：shift + >
+
+	剪贴：
+		dd => p
+===============================================
+编辑模式：
+	i:所在光标前面的插入
+	I:所在光标行行首插入
+	o:所在光标下一行插入
+	O:所在光标上一行插入
+	a:所在光标后面的插入
+	A:所在光标行行尾插入
+	s:删除光标所在字符插入
+	S:上出光标所在行插入
+
+	
+	下载金山打字通 -> 提高打字速度
+
+=================================================
+命令行模式：
+	format :
+		:cmd
+
+常见：
+	:wq
+	:w
+	:q
+	:wq!	:强制保存并退出
+	:q!		:强制退出
+
+临时有效
+	:set number : 表示显示行号
+	or
+	:set nu
+
+	:set nonu	: 取消行号
+
+永久有效：
+	vim ~/.vimrc
+
+读指令：
+	format : :r !cmd
+
+	案例1：读/etc/passwd 的所有内容到当前文件中
+		:r !cat /etc/passwd
+	案例2：获取5行到10行内容到当前文件
+		:r !sed -n "5,10p" /etc/passwd
+
+=================================
+分屏显示：
+	垂直切割：
+		vim -O filename1 filename2 ... filenamen
+		文件之间切换
+			ctrl + w : 2次
+
+		所有文件全部退出：
+			:wqa
+
+		多文件打开基础上添加文件
+			:vsplit filename
+
+		鼠标有效：
+			set mouse=a
+		
+	水平切割：
+		vim -o filename1 filename2 ... filenamen
+		
+
+		:split filename
+===============================================
+插件
+	性感注释：
+		
+	1 下载插件
+		win + r => \\172.18.71.234 => share => vim.tar
+
+	2 拷贝到linux
+		ls /mnt/hgfs/share/vim.tar
+	
+	3 拷贝linux
+		mkdir /tools
+		cp /mnt/hgfs/share/vim.tar /tools
+
+	4 切换到下载目录
+		cd /tools
+		
+	5 解压
+		tar -xvf vim.tar -C ~
+
+	6 使用：
+		,cs	: 性感注释 模块注释
+		,cc : 表示行注释
+		,cu : 表示取消注释
+
+================================================
+C:
+	就是为了操作硬件，做驱动开发（基于kernel基础之上）
+	cortex_A8 => 2.6.35
+
+学习C语言：
+	1 入口 => hello world => main
+	int main(void)
+	{
+		return 0;
+	}
+	2 变量
+		format: var_tyep var_name = value
+	3 函数：
+		函数是C语言最小的编程单位
+
+=================================
+
+	1 基本语句和流程控制  	2days
+	2 函数
+		makefile  lib .so .a 1.5days
+	3 数组：重点
+		VT码				2days
+	4 指针：难点			2days
+	5 结构体 共用体 枚举    1days
+	6 预处理				0.5days
+	7 fileIO				1days
+
+=================================	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

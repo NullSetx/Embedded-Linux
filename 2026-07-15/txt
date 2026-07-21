@@ -1,0 +1,224 @@
+
+
+
+windows : 192.168.2.232
+linux : 192.168.2.254
+
+
+fopen => path mode
+	读：从文件开头读
+	写：
+		覆盖的写	r+
+		清空的写	w w+
+		追加的写	a a+
+
+fclose => 浪费CPU资源
+
+按字节读和写
+	fgetc()
+	fputc()
+	=> EOF => -1
+
+按行操作
+	fgets()
+	fputs()
+=========================================
+
+grep
+	cmd key filename
+
+	r r+ a+
+	
+========================================
+按buf的读和写
+	size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+	第一个参数：表示用于获取数据空间地址
+	第二个参数：表示空间大小  数据类型
+	第三个参数：表示空间个数  空间大小
+		buf => 1024
+		空间大小：1024	512	128	1
+		空间个数：1		2	8	1024
+	第四个参数：表示文件指针
+	返回值：
+		成功：表示获取空间个数
+		失败：小于空间个数或者0
+
+	写：
+		size_t fwrite(const void *ptr, size_t size, size_t nmemb,
+		                     FILE *stream);
+		第一个参数：表示存储数据空间地址
+		第二个参数：表示数据类型
+		第三个参数：表示数据个数
+		第四个参数：表示文件指针
+		返回值：
+			成功：存储数据个数
+
+
+	cp =>fgetc() fputc() <= fread() fwrite() => binary
+	ls /
+
+	
+	注意：
+		操作二进制文件 fread() fwrite()
+
+按格式读和写
+	写：
+		int fprintf(FILE *stream, const char *format, ...);
+	读：
+		int fscanf(FILE *stream, const char *format, ...);
+
+
+练习：
+	struct cls_t{
+		char name[64];
+		int id;
+		int age;
+		char sex;
+		float sum;
+	};
+	//随机10个学生信息
+	=> store => filename
+	=> file => read => struct
+
+	fprintf fcanf
+===================================	
+文件指针偏移：
+	int fseek(FILE *stream, long offset, int whence);
+	第一个参数：表示文件指针
+	第二个参数：表示偏移量
+	第三个参数：表示偏移位置
+		SEEK_SET：表示文件开头
+		SEEK_CUR：表示当前位置
+		SEEK_END：表示问家结尾
+	返回值：
+		成功：0
+		失败：-1
+
+偏移位置：
+	
+	long ftell(FILE *stream);
+指向文件开头
+	void rewind(FILE *stream);
+
+=================
+测试 w+ => ????
+
+===================================
+动态数组：
+	int
+	while (1) => malloc => homework
+	
+
+find : 查看
+	format :
+		cmd + path + option + key
+	案例：
+		[root@www 2026-07-15]# find /ken -name "*write*"
+		/ken/2026-07-15/06_fread_fwrite_cp.c
+		/ken/2026-07-15/04_fwrite.c
+
+	实现char
+
+
+	实现struct cls_t
+
+	123
+	234
+	567
+
+	a
+	y
+	s
+	i
+
+	name id age sex linux c tell address sum boyfriend girlfriend game
+
+=====================================================
+数据结构：
+	
+	数据：描述一件事物本质特征，统称数据
+		包括C语言的所有数据类型 音频 视频
+	结构：
+		存储结构： 大小端
+		逻辑结构：
+			一对一关系：
+				线性表 ： 顺序表 链表 栈和队列
+			一对多关系：
+				树 ： 二叉树
+			多对多关系
+				图 ：
+			松散关系  => 不研究
+
+	就是研究数据的一种逻辑关系就是数据结构
+
+1 顺序表 => 动态数组 => 空间不足或者浪费 1.5
+2 链表   => 重点                         2
+3 栈和队列 =>                            1
+4 排序 => 查找 => 哈希                   1
+5 树                                     1
+================================================
+实现动态数组 => int => homework
+
+struct cls_t{
+	char name[64];
+	int id;
+	int age;
+	char sex;
+	float linux;
+	float c;
+	float sum;
+};
+
+=>
+==============================================
+
+
+tyepdef struct darr_t{
+	void *data;//数据
+	int size;//数据类型
+	int count;//数据个数
+	//。。。。。
+}DARR;
+
+
+homework1:
+
+	1 把10个学生信息 保存到文件中 mem => file
+	   file => mem
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,92 @@
+
+
+
+windows : 172.18.71.208
+	win + r => \\172.18.71.208 => admin
+
+
+for format:
+	for (init; con; add | sub)
+	{
+		body
+	}
+
+while format:
+	init;
+	while (con)
+	{
+		body;
+		add | sub;
+	}
+
+do_while format:
+	init;
+	do{
+		body;
+		add | sub
+	}while(con);
+
+====================================
+死循环：
+	就是条件一直满足
+
+	while (1)
+	{
+	
+		body
+	}
+
+注意两点：
+	1 要有延迟函数
+		sleep : 表示秒
+		usleep : 表示微妙
+	2 一定要有退出条件
+		break		: 如果满足条件，则退出整个循环
+		continue	：如果满足条件，则退出本次循环
+
+		break 和 continue 只对当前的循环有效
+
+
+随机数：
+	#include <stdlib.h>
+
+	int rand(void); 获取随机数
+
+		
+	
+练习：
+	猜数字小游戏
+	100以内数字
+	如果输入数字比随机数小，则提示向大的输入
+	如果输入数字比随机数大，则提示向小的输入
+	如果一致，则退出循环，或者继续玩
+
+
+
+goto : 跳转语句
+
+	format:
+		goto  flag;
+
+
+homwork:
+	goto 实现100以内累加
+	goto 实现99乘法表
+	
+	输入一个数，判断是否是回文数
+	123321 12321
+	123123
+	
+	
+	
+
+
+
+
+
+
+
+
+
+
+
