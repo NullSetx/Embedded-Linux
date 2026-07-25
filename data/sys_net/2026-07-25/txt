@@ -1,0 +1,265 @@
+
+
+
+sys:
+	就是kernel给上层用户提供一些可编程接口，而用户通过这些接口就可以操作kernel,这种编程就是系统编程
+
+	linux : 叫类unix操作系统，确切说就是kernel
+	kernel : 
+		1> 文件系统 ： 就是把硬盘或者U盘抽象成文件系统(驱动)，方便用户访问
+		2> 内存管理：
+			虚拟内存：4G
+				0 - 3G ： user
+					stack	: 局部变量 临时变量 模块变量 调用函数分配空间
+
+					heap	:	动态内存 malloc calloc realloc => free
+						valgrind ./a.out 检测内存泄漏
+					DS		: 全局变量和静态变量
+						BSS	: 未初始化全局变量和静态变量
+						RO	: 初始化
+					const	: 常量
+					code	: 代码段
+				3 - 4G :  kernel
+
+			物理内存：DDR 
+			
+			页表存储机制：把虚拟内存映射到物理内存上。
+
+		3> : 进程管理
+			进程：就是一段可执行程序，且必须放在内存中
+			
+			识别进程的唯一标识 叫进程号
+			特性：
+			动态性：动态产生，动态消亡过程
+			独享性：每一个进程的内存空间都是独立的
+			并发性：每一个进程都在竞争CPU资源，谁先获得谁先运行
+			异步性：某个时间节点，CPU只能运行一段程序
+			
+			进程是由父进程创建
+
+			祖先进程：1号进程
+				所有的进程都是由1号进程直接或者间接创建的
+
+			五态模型：
+				新建态：
+				就绪态：
+				运行态：
+				挂起态：
+				终止态：
+
+		进程之间通讯
+			1 信号
+			2 管道
+			3 消息队列
+			4 共享内存
+			5 信号量
+			6 套接子
+	4> 设备驱动
+	5> 网络协议
+		tcp udp
+================================
+1 sys IO => fileIO  2days
+2 pid pthid => 4days
+3 tcp udp   => 2day
+4 项目      => 2days
+	
+==========================================
+sysio
+fileIO => C => FILE * => read write
+
+fopen
+	path
+	mode => r r+ w w+ a a+
+		 => rb rb+ wb wb+ ab ab+  b表示二进制文件
+		 fread  fwrite => size
+fclose
+
+perror 函数，判断打开失败原因
+errno
+strerror(errno)
+
+fgetc fputc
+fgets fputs
+fread fwrite
+fprintf fscanf
+fseek ftell rewind
+练习：
+	实现cp
+
+======================================
+fopen 	=> 	open
+	r	=>  O_RDONLY
+	r+  =>  O_RDWR
+	w	=> 	O_WRONLY | O_CREAT | O_TRUNC
+	w+	=>  O_RDWR | O_CREAT | O_TRUNC
+	a 	=>  O_WRONLY | O_CREAT | O_AAPEND
+	a+	=> 	O_RDWR | O_CREAT | O_APPEND
+
+my_strcpy => strcpy
+
+====================================
+sys IO
+
+	打开文件
+	int open(const char *pathname, int flags);
+	第一个参数：表示文件路径
+		绝对路径：
+		相对路径：
+	第二个参数：表示标志位
+		O_RDONLY：表示只读
+			如果文件不存在，则打开失败
+			如果文件存在，则从文件开头读
+
+		O_WRONLY：表示只写
+		O_RDWR	：表示可读可写
+		O_APPEND：表示追加
+		O_CREAT	：表示创建
+		O_NONBLOCK	：取消阻塞
+		O_TRUNC	：表示清空
+	返回值：
+		失败：-1
+		成功：文件描述符
+			  未使用最小文件描述符
+
+		0 => stdin
+		1 => stdout
+		2 => stderr
+
+
+	关闭文件
+	int close(int fd);
+
+	int open(const char *pathname, int flags, mode_t mode);
+	int creat(const char *pathname, mode_t mode);
+
+==============================================
+读数据
+	ssize_t read(int fd, void *buf, size_t count);
+	第一个参数：表示文件描述符
+	第二个参数：表示存储数据空间地址
+	第三个参数：表示空间大小
+	返回值：
+		成功：表示获取数据个数
+		失败：-1
+			  0 ： 表示文件结尾
+
+
+写数据
+	ssize_t write(int fd, const void *buf, size_t count);
+	第一个参数：表示文件描述符
+	第二个参数：表示存储数据空间地址
+	第三个参数：表示写数据个数
+	返回值：
+		失败：-1
+		成功：写数据个数
+
+=====================================================
+lseek:
+	off_t lseek(int fd, off_t offset, int whence);
+
+
+练习：./test => hello  同时求文件大小
+	循环获取文件5次内容
+
+===============================================
+zhangsan => write => hello
+lisi     => write => world
+
+赋值或者共享文件描述符
+int dup(int oldfd);
+	参数：表示已存放文件描述符
+	返回值：
+		成功：新的文件描述符
+		失败：-1
+int dup2(int oldfd, int newfd);
+	参数：
+	注意：如果新的文件描述符被使用，则先关闭掉正在使用的新的文件描述符，然后指向旧的文件描述符。
+	重定向
+练习：	
+	echo hello >> a.txt 追加重定向
+
+==========================================
+获取文件状态或者属性
+int fcntl(int fd, int cmd, ... /* arg */ );
+	
+	第二个参数：表示指令：
+		F_DUPFD	: 表示共享文件描述符
+		F_GETFL ： 表示获取文件状态标志
+		F_SETFL ： 表示设置
+
+============================================
+创建指定文件权限
+	int open(const char *pathname, int flags, mode_t mode);
+	（mode & ~umask) =》 0022
+	//111 111 111 
+	  000 010 010
+	  111 101 101
+	  111 101 101 =》 755 =》rwxr-xr-x
+	int creat(const char *pathname, mode_t mode);
+
+	creat()  is  equivalent  to  open()  with   flags   equal   to
+	       O_CREAT|O_WRONLY|O_TRUNC.
+
+=================================================
+获取文件属性状态
+int stat(const char *path, struct stat *buf);
+	第一个参数：表示文件路径
+	第二个参数：文件状态结构体
+	struct stat {
+		dev_t     st_dev;     /* ID of device containing file */
+		ino_t     st_ino;     /* inode number */ 文件索引号，识别文件的唯一标识
+		mode_t    st_mode;    /* protection */ 表示文件权限和类型
+		nlink_t   st_nlink;   /* number of hard links */ 表示硬链接数
+		uid_t     st_uid;     /* user ID of owner */ 用户uid
+		gid_t     st_gid;     /* group ID of owner */ 用户组gid
+		dev_t     st_rdev;    /* device ID (if special file) */
+		off_t     st_size;    /* total size, in bytes */ 文件大小
+		blksize_t st_blksize; /* blocksize for file system I/O */
+		blkcnt_t  st_blocks;  /* number of 512B blocks allocated */
+		time_t    st_atime;   /* time of last access */
+		time_t    st_mtime;   /* time of last modification */
+		time_t    st_ctime;   /* time of last status change */
+	};
+	返回值：
+		失败：-1
+		成功：0
+int fstat(int fd, struct stat *buf);
+int lstat(const char *path, struct stat *buf);
+	
+	7 => rwx
+	6 => rw-
+	5 => r-x
+	4 => r--
+	3 => -wx
+	2 => -w-
+	1 => --x
+	0 => ---
+
+
+
+=======================
+homework:
+	1 sysio => cp
+	2 uid => username
+		/etc/passwd : 用户帐号信息文件
+
+	  gid => groupname
+	  	/etc.group
+	3 实现ll filename
+		
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+		
