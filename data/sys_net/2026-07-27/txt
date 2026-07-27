@@ -1,0 +1,313 @@
+
+
+wnidows : 192.168.2.123
+
+
+S_IFMT     0170000   bit mask for the file type bit fields
+S_IFSOCK   0140000   socket					12
+S_IFLNK    0120000   symbolic link			10
+S_IFREG    0100000   regular file			8
+S_IFBLK    0060000   block device			6
+S_IFDIR    0040000   directory				4
+S_IFCHR    0020000   character device		2
+S_IFIFO    0010000   FIFO					1
+
+char type[] = " pc d b - l s"
+
+==========================================
+通过用户uid（计算机识别用于的唯一标识）转换成username
+struct passwd *getpwuid(uid_t uid);
+struct passwd {
+	char   *pw_name;       /* username */
+	char   *pw_passwd;     /* user password */
+	uid_t   pw_uid;        /* user ID */
+	gid_t   pw_gid;        /* group ID */
+	char   *pw_gecos;      /* real name */
+	char   *pw_dir;        /* home directory */
+	char   *pw_shell;      /* shell program */
+};
+对应文件/etc/passwd 用户帐号信息文件
+
+通过用户名获取用户帐号信息
+struct passwd *getpwnam(const char *name);
+
+循环获取用户信息
+struct passwd *getpwent(void);
+指向/etc/passwd的头
+void setpwent(void);
+关闭/etc/passwd
+void endpwent(void);
+
+==============================
+用户组信息 /etc/group
+struct group *getgrnam(const char *name);
+struct group *getgrgid(gid_t gid);
+struct group *getgrent(void);
+void setgrent(void);
+void endgrent(void);
+
+=================================
+用户密码信息 /etc/shadow
+struct spwd *getspnam(const char *name);
+struct spwd *getspent(void);
+void setspent(void);
+void endspent(void);
+
+==========================
+md6加密算法
+char *crypt(const char *key, const char *salt);
+第一个参数：表示用户输入关键字  明文
+第二个参数：表示密钥
+返回值：暗文
+	暗文 = 密钥 + 密码
+
+链接需要指定密码库 
+	1 iLink with -lcrypt.
+	2 宏必须定义在头文件前面
+
+======================================
+time : 1970 1 1 0 0 0 => now
+
+把秒数转换成字符串
+char *ctime(const time_t *timep);
+char *ctime_r(const time_t *timep, char *buf);
+把秒数转换成时间结构体
+//国际标准时间  + 8 => 本地时间
+struct tm *gmtime(const time_t *timep);
+struct tm *gmtime_r(const time_t *timep, struct tm *result);
+	struct tm {
+		int tm_sec;         /* seconds */
+		int tm_min;         /* minutes */
+		int tm_hour;        /* hours */
+		int tm_mday;        /* day of the month */
+		int tm_mon;         /* month */
+		int tm_year;        /* year */
+		int tm_wday;        /* day of the week */
+		int tm_yday;        /* day in the year */
+		int tm_isdst;       /* daylight saving time */
+	};
+//本地时间
+struct tm *localtime(const time_t *timep);
+struct tm *localtime_r(const time_t *timep, struct tm *result);
+//把时间结构体转换成秒数
+time_t mktime(struct tm *tm);
+//把时间结构体转换成秒数
+char *asctime(const struct tm *tm);
+char *asctime_r(const struct tm *tm, char *buf);
+
+=====================================
+获取时间格式函数
+size_t strftime(char *s, size_t max, const char *format,
+                       const struct tm *tm);
+
+第一个参数：存储获取时间空间地址
+第二个参数：表示空间大小
+第三个参数：表示时间格式
+	年：%y %Y
+	月：%m
+	日：%d
+	时：%H
+	分：%M
+	秒：%S
+	星期：%w
+第四个参数：表示时间结构体
+返回值：
+	成功：表示包含的字节数
+	失败：0
+
+ssize_t readlink(const char *path, char *buf, size_t bufsiz);
+第一个参数：表示文件路径
+第二个参数：表示空间地址 保存目标文件
+第三个参数：表示空间大小
+返回值：
+	失败：-1
+
+
+ll filename => 
+
+
+windws : 192.168.2.115
+
+========================
+创建文件：
+	open creat
+删除文件：
+	int remove(const char *pathname);删除文件或者目录
+	int unlink(const char *pathname);删除文件
+创建目录
+	int mkdir(const char *pathname, mode_t mode);
+删除目录：
+	int rmdir(const char *pathname);
+改变权限：
+	int chmod(const char *path, mode_t mode);
+	int fchmod(int fd, mode_t mode);
+改变属主和属组
+	int chown(const char *path, uid_t owner, gid_t group);
+	int fchown(int fd, uid_t owner, gid_t group);
+	int lchown(const char *path, uid_t owner, gid_t group);
+
+	创建用户：useradd
+	创建用户组：groupadd
+创建硬链接：
+	int link(const char *oldpath, const char *newpath);
+创建软链接：
+	int symlink(const char *oldpath, const char *newpath);
+切换工作目录
+	int chdir(const char *path);
+	int fchdir(int fd);
+获取当前的工作目录
+	char *getcwd(char *buf, size_t size);
+	char *getwd(char *buf);
+	char *get_current_dir_name(void);
+获取系统信息
+	int uname(struct utsname *buf);
+
+===============================================
+打开目录：
+	DIR *opendir(const char *name);
+关闭目录
+	int closedir(DIR *dirp);
+
+
+读目录信息
+	struct dirent *readdir(DIR *dirp);
+	struct dirent {
+		ino_t          d_ino;       /* inode number */ 文件索引号
+		off_t          d_off;       /* offset to the next dirent */
+			偏移下一个目录偏移量，上层用户无需关心
+		unsigned short d_reclen;    /* length of this record */
+			表示当前结构体大小
+		unsigned char  d_type;      /* type of file; not supported
+									   by all file system types */
+			表示文件类型
+				- l d b c p s
+		char           d_name[256]; /* filename */ 
+	};
+	DT_BLK      This is a block device.
+	DT_CHR      This is a character device.
+	DT_DIR      This is a directory.
+	DT_FIFO     This is a named pipe (FIFO).
+	DT_LNK      This is a symbolic link.
+	DT_REG      This is a regular file.
+	DT_SOCK     This is a Unix domain socket.
+	DT_UNKNOWN  The file type is unknown.
+
+=================================
+
+======================================
+进程：
+	定义：就是一段可执行的代码，并放在内存中运行
+
+	识别：进程号 ：是由系统随机指定，不由用户来指定
+		ps -ef 
+		ps -aux
+	
+	所有进程都是有父进程创建的，把父进程的资源做一个拷贝，然后给子进程。
+
+	祖先进程：1号进程
+		所有的进程都是由1号进程间接或者直接创建。
+
+	杀死进程：
+		kill -9 pid
+
+	特性：
+		动态性  独享性  并发性  异步性
+	5态模型：
+		新建态：就是建立进程所需要的资源
+			包括：建立进程表相,文件表相，打开文件 缓冲区 分配变量堆栈 ...
+		就绪态：
+			就是等待CPU分配运行的资源，就是等待CPU把程序调到内存中
+		运行态：
+			就是获得CPU运行的资源，并在内存中运行
+		挂起态：也叫阻塞态
+			因某个IO请求或者中断而处于挂起状态
+		终止态：
+			系统回收建立进程时锁分配的资源。
+
+进程运行过程中显示状态信息 ps -aux
+	D    Uninterruptible sleep (usually IO)
+	R    Running or runnable (on run queue)
+	S    Interruptible sleep (waiting for an event to complete)
+	T    Stopped, either by a job control signal or because it is
+	being traced.
+	W    paging (not valid since the 2.6.xx kernel)
+	X    dead (should never be seen)
+	Z    Defunct ("zombie") process, terminated but not reaped by
+	its parent.
+
+	<    high-priority (not nice to other users)
+	N    low-priority (nice to other users)
+	L    has pages locked into memory (for real-time and
+			custom IO)
+	s    is a session leader
+	l    is multi-threaded (using CLONE_THREAD, like NPTL
+			pthreads do)
+	+    is in the foreground process group
+核心：
+	进程之间通讯：
+	信号 管道 消息队列 共享内存 信号量 套接子
+================================================
+
+获取进程的进程号：
+	getpid()
+获取父进程号：
+	getppid()
+创建子进程：
+	pid_t fork(void);
+	返回值：
+		child_id => 父进程
+		0  => child
+		-1 => error
+
+3 练习：验证heap空间是否是独享还是共享？
+
+homework:
+	1 实现tree命令
+	2 实现加密解密算法
+		hello => 
+
+		'h' => 8bit => h4bit <===> l4bit => '?' => 解密
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

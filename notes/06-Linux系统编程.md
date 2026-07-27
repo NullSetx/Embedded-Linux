@@ -8,6 +8,7 @@
 
 | 日期 | 章节 | 更新内容 |
 |------|------|----------|
+| 2026-07-27 | 第7-14章 | sys IO综合（cp实现、文件类型位运算查表）、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |
 | 2026-07-25 | 第1-6章 | 新建笔记：系统编程概述、标准IO回顾、sys IO（open/close/read/write/lseek）、文件描述符与dup/dup2/fcntl、非阻塞IO、文件权限与umask、stat/lstat文件属性、文件类型检测、课后作业 |
 
 ---
@@ -565,6 +566,605 @@ putchar('\n');
 
 ---
 
+## 第7章 sys IO 综合练习
+
+### 7.1 实现 cp 命令
+
+```c
+// 01_cp.c — 用 sys IO 实现文件拷贝
+int main(int argc, char *argv[])
+{
+    char buf[1024];
+    int fdr, fdw;
+    int ret;
+
+    fdr = open(argv[1], O_RDONLY);
+    fdw = creat(argv[2], 0777);
+
+    while (1) {
+        ret = read(fdr, buf, sizeof(buf));
+        if (ret <= 0) break;
+        write(fdw, buf, ret);
+    }
+
+    close(fdr);
+    close(fdw);
+    return 0;
+}
+```
+
+### 7.2 文件类型检测 — 位运算优化
+
+上一章用 `S_ISREG(m)` 等宏逐个判断，本质是 `m & S_IFMT` 与文件类型掩码比较。
+
+**文件类型位掩码**（`st_mode & S_IFMT` 的结果）：
+
+| 宏 | 八进制值 | 右移12位 | 类型 | 查表字符 |
+|----|----------|----------|------|----------|
+| `S_IFSOCK` | 0140000 | 12 | socket | s |
+| `S_IFLNK` | 0120000 | 10 | symlink | l |
+| `S_IFREG` | 0100000 | 8 | regular | - |
+| `S_IFBLK` | 0060000 | 6 | block | b |
+| `S_IFDIR` | 0040000 | 4 | directory | d |
+| `S_IFCHR` | 0020000 | 2 | char | c |
+| `S_IFIFO` | 0010000 | 1 | FIFO | p |
+
+**查表法一行输出文件类型和权限**：
+
+```c
+// 03_stat.c — 优化版
+char type[] = " pc d b - l s";  // 索引: 0~7 对应 (mode>>12) & 0xF 后的值
+                                 // 索引: 1=p,2=c,3=空格,4=d,5=空格,6=b,7=空格,8=-,9=空格,10=l,11=空格,12=s
+
+char *mode_str[] = {"---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
+
+struct stat s;
+stat(argv[1], &s);
+
+// 类型 + 三组权限
+printf("%c%s%s%s\n",
+    type[(s.st_mode & S_IFMT) >> 12],          // 文件类型
+    mode_str[(s.st_mode & S_IRWXU) >> 6],       // owner rwx
+    mode_str[(s.st_mode & S_IRWXG) >> 3],       // group rwx
+    mode_str[s.st_mode & S_IRWXO]);             // other rwx
+```
+
+> 输出示例：`-rwxr-xr-x` 或 `drwx------`
+
+---
+
+## 第8章 用户与组信息管理
+
+### 8.1 /etc/passwd — 用户帐号信息
+
+```c
+#include <pwd.h>
+
+struct passwd {
+    char   *pw_name;    // 用户名
+    char   *pw_passwd;  // 密码（已移至 shadow）
+    uid_t   pw_uid;     // 用户 ID
+    gid_t   pw_gid;     // 组 ID
+    char   *pw_gecos;   // 真实姓名
+    char   *pw_dir;     // 家目录
+    char   *pw_shell;   // shell 程序
+};
+```
+
+**API 函数**：
+
+| 函数 | 作用 |
+|------|------|
+| `getpwuid(uid)` | 通过 UID 获取用户信息 |
+| `getpwnam(name)` | 通过用户名获取用户信息 |
+| `getpwent()` | 循环读取（遍历 passwd） |
+| `setpwent()` | 重置到文件头 |
+| `endpwent()` | 关闭 passwd 文件 |
+
+```c
+// 04_get_user_info.c — UID→用户名 + 遍历
+struct passwd *pw;
+
+// 按 UID 查询
+pw = getpwuid(atoi(argv[1]));
+printf("name : %s uid : %d shell : %s\n", pw->pw_name, pw->pw_uid, pw->pw_shell);
+
+// 遍历所有用户
+while ((pw = getpwent()) != NULL)
+    printf("name : %s uid : %d\n", pw->pw_name, pw->pw_uid);
+
+setpwent();  // 回到文件头，可再次遍历
+endpwent();
+```
+
+```c
+// 02_uid_name.c — 通过解析 /etc/passwd 用 UID 反查用户名（纯字符串解析）
+fp = fopen(argv[1], "r");
+while (fgets(buf, sizeof(buf), fp) != NULL) {
+    // /etc/passwd 格式: name:x:UID:GID:...
+    if (atoi(strchr(strchr(buf, ':') + 1, ':') + 1) == atoi(argv[2])) {
+        *(strchr(buf, ':')) = '\0';   // 截断得到用户名
+        printf("%s\n", buf);
+    }
+}
+```
+
+### 8.2 /etc/group — 用户组信息
+
+```c
+#include <grp.h>
+
+struct group {
+    char   *gr_name;    // 组名
+    char   *gr_passwd;  // 组密码
+    gid_t   gr_gid;     // 组 ID
+    char  **gr_mem;     // 组成员用户名列表（NULL 结尾）
+};
+```
+
+| 函数 | 作用 |
+|------|------|
+| `getgrnam(name)` | 通过组名获取组信息 |
+| `getgrgid(gid)` | 通过 GID 获取组信息 |
+| `getgrent()` | 循环遍历 |
+| `setgrent()` / `endgrent()` | 重置/关闭 |
+
+```c
+// 05_get_group_info.c — 获取组成员列表
+struct group *gr = getgrnam(argv[1]);
+for (int i = 0; gr->gr_mem[i] != NULL; i++)
+    printf("%s\n", gr->gr_mem[i]);
+```
+
+### 8.3 /etc/shadow — 用户密码信息
+
+```c
+#include <shadow.h>
+
+struct spwd {
+    char *sp_namp;     // 用户名
+    char *sp_pwdp;     // 加密后的密码（密文）
+    // ... 密码过期相关字段
+};
+```
+
+| 函数 | 作用 |
+|------|------|
+| `getspnam(name)` | 通过用户名获取密码信息 |
+| `getspent()` | 循环遍历 |
+| `setspent()` / `endspent()` | 重置/关闭 |
+
+```c
+// 06_get_passwd_info.c
+struct spwd *sp = getspnam(argv[1]);
+printf("sp->sp_pwdp : %s\n", sp->sp_pwdp);  // 打印加密密码
+```
+
+---
+
+## 第9章 口令加密（crypt）
+
+### 9.1 crypt 函数
+
+```c
+// 需定义宏 + 链接 -lcrypt
+#define _XOPEN_SOURCE         // 必须放在所有 include 之前
+#include <unistd.h>
+
+char *crypt(const char *key, const char *salt);
+```
+
+- `key`：用户输入的明文密码
+- `salt`：密钥（从 shadow 密文中提取）
+- 返回值：密文 = 密钥 + 加密结果
+- 编译需加 `-lcrypt`
+
+### 9.2 密码验证流程
+
+shadow 中存储的密文格式：`$1$salt$encrypted`，需从中提取 salt。
+
+```c
+// 07_crypt.c — 密码验证
+#define _XOPEN_SOURCE
+#include <shadow.h>
+
+struct spwd *sp = getspnam(argv[1]);
+char salt[64], key[64];
+
+// 从 sp->sp_pwdp 提取 salt（"$1$salt$..." → "$1$salt$"）
+strcpy(tmp, sp->sp_pwdp);
+*(strrchr(tmp, '$') + 1) = '\0';
+strcpy(salt, tmp);
+
+// 用户输入 → 加密 → 比对
+GETLINES("input key : ", key);
+char *passwd = crypt(key, salt);
+
+if (strcmp(sp->sp_pwdp, passwd) == 0)
+    printf("login ok!\n");
+else
+    printf("passwd input error!\n");
+```
+
+---
+
+## 第10章 时间函数
+
+### 10.1 基本时间函数
+
+时间起点：**1970-01-01 00:00:00 (UTC)**，`time_t` 表示从此时起的秒数。
+
+```c
+#include <time.h>
+
+time_t t;
+t = time(NULL);          // 获取当前秒数
+// 或 time(&t);
+```
+
+### 10.2 函数一览
+
+| 函数 | 作用 |
+|------|------|
+| `time(&t)` | 获取当前秒数（参数可为 NULL） |
+| `ctime(&t)` | 秒数 → 字符串（自带换行） |
+| `ctime_r(&t, buf)` | 线程安全版 |
+| `gmtime(&t)` | 秒数 → UTC 时间结构体 |
+| `localtime(&t)` | 秒数 → 本地时间结构体（UTC+8） |
+| `mktime(&tm)` | 时间结构体 → 秒数 |
+| `asctime(&tm)` | 时间结构体 → 字符串 |
+
+### 10.3 struct tm 结构体
+
+```c
+struct tm {
+    int tm_sec;    // 秒   (0-59)
+    int tm_min;    // 分   (0-59)
+    int tm_hour;   // 时   (0-23)
+    int tm_mday;   // 日   (1-31)
+    int tm_mon;    // 月   (0-11, +1 得实际月份)
+    int tm_year;   // 年   (从 1900 起算, +1900 得实际年份)
+    int tm_wday;   // 星期 (0=周日)
+    int tm_yday;   // 年中第几天
+    int tm_isdst;  // 夏令时标志
+};
+```
+
+```c
+// 08_time.c
+time_t t;
+struct tm *tm;
+
+t = time(NULL);
+printf("time : %s\n", ctime(&t));            // 字符串输出
+
+tm = localtime(&t);                           // 本地时间
+printf("%d-%d-%d %d:%d:%d\n",
+    tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+    tm->tm_hour, tm->tm_min, tm->tm_sec);
+```
+
+### 10.4 strftime — 格式化时间
+
+```c
+size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
+```
+
+**常用格式符**：
+
+| 格式 | 含义 | 示例 |
+|------|------|------|
+| `%Y` | 四位年份 | 2026 |
+| `%y` | 两位年份 | 26 |
+| `%m` | 月份 | 07 |
+| `%d` | 日期 | 27 |
+| `%H` | 24小时制 | 15 |
+| `%M` | 分钟 | 30 |
+| `%S` | 秒 | 45 |
+| `%w` | 星期几(0=日) | 1 |
+| `%D` | = `%m/%d/%y` | 07/27/26 |
+
+```c
+// 09_time_format.c
+time_t t = time(NULL);
+struct tm *tm = localtime(&t);
+char buf[1024];
+
+strftime(buf, sizeof(buf), "%Y/%m/%d(%D) %H:%M:%S", tm);
+printf("buf : %s\n", buf);  // 输出: 2026/07/27(07/27/26) 15:30:45
+```
+
+---
+
+## 第11章 文件系统操作
+
+### 11.1 readlink — 读取符号链接
+
+```c
+ssize_t readlink(const char *path, char *buf, size_t bufsiz);
+```
+
+读取符号链接指向的目标文件路径，不穿透链接。
+
+```c
+// 10_file_syslink.c
+char buf[128];
+ret = readlink(argv[1], buf, sizeof(buf));
+printf("%s -> %s\n", argv[1], buf);
+```
+
+### 11.2 文件和目录操作
+
+| 函数 | 作用 |
+|------|------|
+| `creat(path, mode)` | 创建文件 |
+| `remove(path)` | 删除文件或空目录 |
+| `unlink(path)` | 删除文件 |
+| `mkdir(path, mode)` | 创建目录 |
+| `rmdir(path)` | 删除空目录 |
+
+### 11.3 权限和属主
+
+```c
+int chmod(const char *path, mode_t mode);     // 改变权限
+int fchmod(int fd, mode_t mode);              // 通过 fd 改权限
+
+int chown(const char *path, uid_t owner, gid_t group);   // 改属主和属组
+int fchown(int fd, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group);  // 符号链接本身
+```
+
+```c
+// 11_chmod.c
+chmod(argv[1], 0777);
+// 或使用宏：
+chmod(argv[1], S_IRWXU | S_IRWXG | S_IRWXO);
+```
+
+```c
+// 12_chown.c
+chown(argv[1], atoi(argv[2]), atoi(argv[3]));
+// 创建用户: useradd   创建组: groupadd
+```
+
+### 11.4 硬链接和软链接
+
+```c
+int link(const char *oldpath, const char *newpath);     // 创建硬链接
+int symlink(const char *oldpath, const char *newpath);  // 创建软链接（符号链接）
+```
+
+| | 硬链接 | 软链接 |
+|------|------|------|
+| inode | 相同 | 不同 |
+| 跨文件系统 | 不行 | 可以 |
+| 删除原文件 | 仍可访问 | 断链失效 |
+| 指向目录 | 不允许 | 可以 |
+
+### 11.5 工作目录操作
+
+```c
+int chdir(const char *path);                 // 切换工作目录
+int fchdir(int fd);                          // 通过 fd 切换
+
+char *getcwd(char *buf, size_t size);        // 获取当前路径（到 buf）
+char *getwd(char *buf);                      // 同上（已废弃）
+char *get_current_dir_name(void);            // malloc 返回路径（需 free）
+```
+
+```c
+// 13_chdir.c — 切换目录并查看
+#define _GNU_SOURCE                // get_current_dir_name 需要
+printf("pwd : %s\n", get_current_dir_name());
+chdir("..");
+printf("pwd : %s\n", get_current_dir_name());
+printf("pwd : %s\n", getcwd(buf, sizeof(buf)));
+```
+
+### 11.6 获取系统信息
+
+```c
+#include <sys/utsname.h>
+int uname(struct utsname *buf);  // 获取系统名称/版本/架构等信息
+```
+
+---
+
+## 第12章 目录操作
+
+### 12.1 目录流操作
+
+```c
+#include <dirent.h>
+
+DIR *opendir(const char *name);         // 打开目录
+int closedir(DIR *dirp);                // 关闭目录
+struct dirent *readdir(DIR *dirp);      // 读取目录项（每次返回一项）
+```
+
+### 12.2 struct dirent 结构体
+
+```c
+struct dirent {
+    ino_t          d_ino;       // inode 号
+    off_t          d_off;       // 下一项偏移量（上层无需关心）
+    unsigned short d_reclen;    // 当前结构体大小
+    unsigned char  d_type;      // 文件类型
+    char           d_name[256]; // 文件名
+};
+```
+
+**d_type 类型常量**：
+
+| 宏 | 文件类型 |
+|----|----------|
+| `DT_REG` | 普通文件 |
+| `DT_DIR` | 目录 |
+| `DT_CHR` | 字符设备 |
+| `DT_BLK` | 块设备 |
+| `DT_FIFO` | 命名管道 |
+| `DT_LNK` | 符号链接 |
+| `DT_SOCK` | socket |
+| `DT_UNKNOWN` | 未知 |
+
+```c
+// 14_opendir.c — 遍历目录（跳过隐藏文件）
+DIR *dir = opendir(argv[1]);
+struct dirent *d;
+
+while ((d = readdir(dir)) != NULL) {
+    if (d->d_name[0] == '.') continue;  // 跳过 . .. 和隐藏文件
+    printf("inode : %d  type : %d  name : %s\n", d->d_ino, d->d_type, d->d_name);
+}
+closedir(dir);
+```
+
+---
+
+## 第13章 进程基础
+
+### 13.1 进程概念回顾
+
+**进程**：一段可执行代码，存放在内存中运行。
+
+| 特性 | 说明 |
+|------|------|
+| 动态性 | 动态产生、动态消亡 |
+| 独享性 | 每个进程的内存空间独立 |
+| 并发性 | 多进程竞争 CPU |
+| 异步性 | 任一时刻 CPU 只运行一段程序 |
+
+### 13.2 五态模型细化
+
+```
+新建态 → 就绪态 → 运行态 → 终止态
+              ↕
+            挂起态（阻塞态）
+```
+
+- **新建态**：建立进程所需资源（进程表项、文件表项、打开文件、缓冲区、分配变量堆栈等）
+- **就绪态**：等待 CPU 将程序调入内存
+- **运行态**：获得 CPU 资源并在内存中运行
+- **挂起态**：因 IO 请求或中断而挂起（阻塞）
+- **终止态**：系统回收进程创建时分配的所有资源
+
+### 13.3 ps -aux 进程状态
+
+| 状态 | 含义 |
+|------|------|
+| D | 不可中断睡眠（通常等待 IO） |
+| R | 运行中或可运行 |
+| S | 可中断睡眠（等待事件完成） |
+| T | 停止（作业控制信号或正在被跟踪） |
+| X | 死亡（不应看到） |
+| Z | 僵尸进程（已终止但父进程未回收） |
+| < | 高优先级 |
+| N | 低优先级 |
+| s | 会话领导者 |
+| l | 多线程 |
+| + | 前台进程组 |
+
+### 13.4 获取进程号
+
+```c
+#include <unistd.h>
+
+pid_t getpid();   // 获取当前进程 PID
+pid_t getppid();  // 获取父进程 PPID
+```
+
+```c
+// 16_pid.c
+printf("pid : %d\n", getpid());
+printf("ppid : %d\n", getppid());
+```
+
+### 13.5 fork — 创建子进程
+
+```c
+pid_t fork(void);
+```
+
+**fork 调用一次，返回两次**：
+
+| 返回值 | 含义 |
+|--------|------|
+| `> 0` | 在父进程中，值为子进程 PID |
+| `0` | 在子进程中 |
+| `-1` | 失败 |
+
+子进程是父进程的**拷贝**——复制父进程的所有资源（代码、数据、堆栈、打开文件等）。
+
+```c
+// 17_fork.c
+pid_t ret = fork();
+
+if (ret == -1) {
+    printf("fork failed!\n");
+} else if (ret == 0) {
+    printf("child!  pid = %d  ppid = %d\n", getpid(), getppid());
+} else {
+    printf("parent! pid = %d  ppid = %d\n", getpid(), getppid());
+    printf("parent! ret = %d (child pid)\n", ret);
+}
+```
+
+### 13.6 父子进程内存独享性验证
+
+**验证1：栈变量**
+
+```c
+// 18_stack.c — 父子各自修改栈变量，互不影响
+int count = 1122;  // 栈变量
+
+if (fork() == 0) {
+    // 子进程
+    count = 3344;                           // 子进程修改
+    printf("child  : count = %d\n", count); // 3344
+} else {
+    // 父进程
+    printf("parent : count = %d\n", count); // 1122 (不变!)
+}
+```
+
+**验证2：全局变量（DS段）**
+
+```c
+// 19_env.c — 父子各自修改全局变量，互不影响
+int e = 12345;  // DS 段（全局变量）
+
+if (fork() == 0) {
+    printf("child  e = %d\n", e);  // 12345
+    e = 5678;                       // 子进程修改
+    printf("child  e = %d\n", e);  // 5678
+} else {
+    sleep(1);
+    printf("parent e = %d\n", e);  // 12345 (不变!)
+}
+```
+
+> **结论**：fork 后父子进程的内存空间完全独立，各自修改变量互不影响。"拷贝"是写时复制（COW）。
+
+### 13.7 进程间通信（IPC）方式
+
+1. 信号
+2. 管道
+3. 消息队列
+4. 共享内存
+5. 信号量
+6. 套接字（socket）
+
+---
+
+## 第14章 课后作业
+
+| 序号 | 作业 | 要点 |
+|------|------|------|
+| 1 | 实现 tree 命令 | 递归遍历目录，缩进打印树形结构（综合 opendir/readdir/stat） |
+| 2 | 实现加密解密算法 | 将 "hello" 每字节高4位与低4位交换，实现可逆加密 |
+
+---
+
 ## 本章小结
 
 ```
@@ -576,4 +1176,11 @@ fcntl/非阻塞IO    ███████████████████�
 文件权限/umask    ████████████████████
 stat/文件属性     ████████████████████
 文件类型检测      ████████████████████
+sys IO 综合练习   ████████████████████
+用户与组信息      ████████████████████
+口令加密crypt     ████████████████████
+时间函数          ████████████████████
+文件系统操作      ████████████████████
+目录操作          ████████████████████
+进程基础/fork     ████████████████████
 ```
