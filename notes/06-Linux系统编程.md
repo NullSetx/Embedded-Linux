@@ -128,16 +128,22 @@ C 标准库文件操作 → sys IO 的映射关系：
 
 ### 2.1 标准IO函数速查
 
-| 函数 | 作用 |
-|------|------|
-| `fopen(path, mode)` | 打开文件 |
-| `fclose(fp)` | 关闭文件 |
-| `fgetc/fputc` | 字符读写 |
-| `fgets/fputs` | 字符串读写 |
-| `fread/fwrite` | 按块读写（二进制：size 参数有效） |
-| `fprintf/fscanf` | 格式化读写 |
-| `fseek/ftell/rewind` | 文件定位 |
-| `perror/errno/strerror` | 错误处理 |
+| 函数 | 作用 | 返回值 |
+|------|------|--------|
+| `fopen(path, mode)` | 打开文件 | 成功: `FILE*`，失败: `NULL` |
+| `fclose(fp)` | 关闭文件 | 成功: `0`，失败: `EOF` |
+| `fgetc(fp)` | 读一个字符 | 成功: 字符(转`int`)，失败/EOF: `EOF` |
+| `fputc(c, fp)` | 写一个字符 | 成功: 写入的字符，失败: `EOF` |
+| `fgets(buf, n, fp)` | 读一行字符串 | 成功: `buf`，失败/EOF: `NULL` |
+| `fputs(s, fp)` | 写字符串 | 成功: 非负值，失败: `EOF` |
+| `fread(buf, sz, n, fp)` | 按块读 | 成功: 实际读取块数，失败/EOF: `0` |
+| `fwrite(buf, sz, n, fp)` | 按块写 | 成功: 实际写入块数，失败: `0` |
+| `fprintf(fp, fmt, ...)` | 格式化写 | 成功: 写入字节数，失败: 负值 |
+| `fscanf(fp, fmt, ...)` | 格式化读 | 成功: 匹配项数，失败/EOF: `EOF` |
+| `fseek(fp, off, whence)` | 文件定位 | 成功: `0`，失败: 非0 |
+| `ftell(fp)` | 获取当前位置 | 成功: 偏移量，失败: `-1L` |
+| `rewind(fp)` | 回到开头(`fseek(fp,0,SEEK_SET)`) | 无返回值 |
+| `perror(msg)` | 打印 errno 对应错误信息 | 无返回值 |
 
 ### 2.2 mode 映射表
 
@@ -218,6 +224,10 @@ close(fd);
 ```c
 int close(int fd);
 ```
+
+**返回值**：
+- 成功：`0`
+- 失败：`-1`（errno 设置错误码）
 
 ### 3.4 标准文件描述符
 
@@ -305,7 +315,11 @@ off_t lseek(int fd, off_t offset, int whence);
 | `SEEK_CUR` | 从当前位置偏移 |
 | `SEEK_END` | 从文件末尾偏移 |
 
-**技巧**：`lseek(fd, 0, SEEK_END)` 可获取文件大小。
+**返回值**：
+- 成功：新的文件偏移量（距文件开头的字节数）
+- 失败：`-1`
+
+**技巧**：`lseek(fd, 0, SEEK_END)` 返回文件大小。
 
 ```c
 // 08_lseek.c — lseek 基本用法
@@ -335,6 +349,10 @@ printf("size : %d\n", lseek(fd, 0, SEEK_END));
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
 ```
+
+**返回值**：
+- 成功：新的文件描述符
+- 失败：`-1`
 
 - `dup`：复制 fd，返回新的最小可用 fd
 - `dup2`：将 newfd 指向 oldfd（若 newfd 已打开则先关闭）
@@ -370,11 +388,13 @@ int fcntl(int fd, int cmd, ... /* arg */);
 
 **cmd 指令**：
 
-| 指令 | 作用 |
-|------|------|
-| `F_DUPFD` | 复制文件描述符（同 dup） |
-| `F_GETFL` | 获取文件状态标志 |
-| `F_SETFL` | 设置文件状态标志 |
+| 指令 | 作用 | 返回值 |
+|------|------|--------|
+| `F_DUPFD` | 复制文件描述符 | 新 fd |
+| `F_GETFL` | 获取文件状态标志 | 标志值 |
+| `F_SETFL` | 设置文件状态标志 | `0` |
+
+所有 cmd 失败均返回 `-1`。
 
 `F_DUPFD` 第三个参数指定起始 fd 号：`fcntl(fd, F_DUPFD, 88)` ≈ `dup2(fd, 88)`。
 
@@ -415,6 +435,10 @@ int main(int argc, char *argv[])
 
 ### 4.1 umask
 
+```c
+mode_t umask(mode_t mask);   // 设置文件权限掩码，返回旧 umask 值（总是成功）
+```
+
 创建文件时的实际权限 = `mode & ~umask`
 
 ```
@@ -449,6 +473,10 @@ int creat(const char *pathname, mode_t mode);
 
 等价于：`open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode)`
 
+**返回值**：
+- 成功：文件描述符（fd）
+- 失败：`-1`
+
 ---
 
 ## 第5章 文件属性
@@ -460,6 +488,8 @@ int stat(const char *path, struct stat *buf);
 int fstat(int fd, struct stat *buf);
 int lstat(const char *path, struct stat *buf);
 ```
+
+**返回值**：成功 `0`，失败 `-1`。
 
 | 函数 | 区别 |
 |------|------|
@@ -653,13 +683,13 @@ struct passwd {
 
 **API 函数**：
 
-| 函数 | 作用 |
-|------|------|
-| `getpwuid(uid)` | 通过 UID 获取用户信息 |
-| `getpwnam(name)` | 通过用户名获取用户信息 |
-| `getpwent()` | 循环读取（遍历 passwd） |
-| `setpwent()` | 重置到文件头 |
-| `endpwent()` | 关闭 passwd 文件 |
+| 函数 | 作用 | 返回值 |
+|------|------|--------|
+| `getpwuid(uid)` | 通过 UID 获取用户信息 | 成功: `struct passwd*`，失败: `NULL` |
+| `getpwnam(name)` | 通过用户名获取用户信息 | 成功: `struct passwd*`，失败: `NULL` |
+| `getpwent()` | 循环遍历，每次返回下一项 | 成功: `struct passwd*`，结束/失败: `NULL` |
+| `setpwent()` | 重置到文件头 | `void` |
+| `endpwent()` | 关闭 passwd 文件 | `void` |
 
 ```c
 // 04_get_user_info.c — UID→用户名 + 遍历
@@ -702,12 +732,13 @@ struct group {
 };
 ```
 
-| 函数 | 作用 |
-|------|------|
-| `getgrnam(name)` | 通过组名获取组信息 |
-| `getgrgid(gid)` | 通过 GID 获取组信息 |
-| `getgrent()` | 循环遍历 |
-| `setgrent()` / `endgrent()` | 重置/关闭 |
+| 函数 | 作用 | 返回值 |
+|------|------|--------|
+| `getgrnam(name)` | 通过组名获取组信息 | 成功: `struct group*`，失败: `NULL` |
+| `getgrgid(gid)` | 通过 GID 获取组信息 | 成功: `struct group*`，失败: `NULL` |
+| `getgrent()` | 循环遍历 | 成功: `struct group*`，结束/失败: `NULL` |
+| `setgrent()` | 重置到文件头 | `void` |
+| `endgrent()` | 关闭 group 文件 | `void` |
 
 ```c
 // 05_get_group_info.c — 获取组成员列表
@@ -728,11 +759,12 @@ struct spwd {
 };
 ```
 
-| 函数 | 作用 |
-|------|------|
-| `getspnam(name)` | 通过用户名获取密码信息 |
-| `getspent()` | 循环遍历 |
-| `setspent()` / `endspent()` | 重置/关闭 |
+| 函数 | 作用 | 返回值 |
+|------|------|--------|
+| `getspnam(name)` | 通过用户名获取密码信息 | 成功: `struct spwd*`，失败: `NULL` |
+| `getspent()` | 循环遍历 | 成功: `struct spwd*`，结束/失败: `NULL` |
+| `setspent()` | 重置到文件头 | `void` |
+| `endspent()` | 关闭 shadow 文件 | `void` |
 
 ```c
 // 06_get_passwd_info.c
@@ -756,7 +788,7 @@ char *crypt(const char *key, const char *salt);
 
 - `key`：用户输入的明文密码
 - `salt`：密钥（从 shadow 密文中提取）
-- 返回值：密文 = 密钥 + 加密结果
+- 返回值：成功返回密文（密钥+加密结果），失败返回 `NULL`
 - 编译需加 `-lcrypt`
 
 ### 9.2 密码验证流程
@@ -797,22 +829,31 @@ else
 ```c
 #include <time.h>
 
+time_t time(time_t *tloc);   // 参数可为 NULL，返回秒数（同时写入 *tloc）
+```
+
+**返回值**：成功返回从 epoch 起的秒数，失败返回 `(time_t)-1`。
+
+```c
 time_t t;
-t = time(NULL);          // 获取当前秒数
-// 或 time(&t);
+t = time(NULL);          // 仅通过返回值获取
+// 或 time(&t);          // 同时写入 t
 ```
 
 ### 10.2 函数一览
 
-| 函数 | 作用 |
-|------|------|
-| `time(&t)` | 获取当前秒数（参数可为 NULL） |
-| `ctime(&t)` | 秒数 → 字符串（自带换行） |
-| `ctime_r(&t, buf)` | 线程安全版 |
-| `gmtime(&t)` | 秒数 → UTC 时间结构体 |
-| `localtime(&t)` | 秒数 → 本地时间结构体（UTC+8） |
-| `mktime(&tm)` | 时间结构体 → 秒数 |
-| `asctime(&tm)` | 时间结构体 → 字符串 |
+| 函数 | 作用 | 返回值 |
+|------|------|--------|
+| `time(&t)` | 获取当前秒数（参数可为 NULL） | 成功: 秒数(`time_t`)，失败: `(time_t)-1` |
+| `ctime(&t)` | 秒数 → 字符串（自带换行） | 成功: `char*`（静态缓冲区），失败: `NULL` |
+| `ctime_r(&t, buf)` | `ctime` 线程安全版 | 成功: `buf`，失败: `NULL` |
+| `gmtime(&t)` | 秒数 → UTC 时间 `struct tm` | 成功: `struct tm*`（静态），失败: `NULL` |
+| `gmtime_r(&t, &result)` | `gmtime` 线程安全版 | 成功: `result` 指针，失败: `NULL` |
+| `localtime(&t)` | 秒数 → 本地时间 `struct tm` (UTC+8) | 成功: `struct tm*`（静态），失败: `NULL` |
+| `localtime_r(&t, &result)` | `localtime` 线程安全版 | 成功: `result` 指针，失败: `NULL` |
+| `mktime(&tm)` | `struct tm` → 秒数 | 成功: `time_t`，失败: `(time_t)-1` |
+| `asctime(&tm)` | `struct tm` → 字符串 | 成功: `char*`（静态），失败: `NULL` |
+| `asctime_r(&tm, buf)` | `asctime` 线程安全版 | 成功: `buf`，失败: `NULL` |
 
 ### 10.3 struct tm 结构体
 
@@ -886,6 +927,8 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 
 读取符号链接指向的目标文件路径，不穿透链接。
 
+**返回值**：成功返回写入 `buf` 的字节数（不含 `\0`），失败 `-1`。
+
 ```c
 // 10_file_syslink.c
 char buf[128];
@@ -895,13 +938,13 @@ printf("%s -> %s\n", argv[1], buf);
 
 ### 11.2 文件和目录操作
 
-| 函数 | 作用 |
-|------|------|
-| `creat(path, mode)` | 创建文件 |
-| `remove(path)` | 删除文件或空目录 |
-| `unlink(path)` | 删除文件 |
-| `mkdir(path, mode)` | 创建目录 |
-| `rmdir(path)` | 删除空目录 |
+| 函数 | 作用 | 返回值 |
+|------|------|--------|
+| `creat(path, mode)` | 创建文件 | 成功: fd，失败: `-1` |
+| `remove(path)` | 删除文件或空目录 | 成功: `0`，失败: `-1` |
+| `unlink(path)` | 删除文件 | 成功: `0`，失败: `-1` |
+| `mkdir(path, mode)` | 创建目录 | 成功: `0`，失败: `-1` |
+| `rmdir(path)` | 删除空目录 | 成功: `0`，失败: `-1` |
 
 ### 11.3 权限和属主
 
@@ -913,6 +956,8 @@ int chown(const char *path, uid_t owner, gid_t group);   // 改属主和属组
 int fchown(int fd, uid_t owner, gid_t group);
 int lchown(const char *path, uid_t owner, gid_t group);  // 符号链接本身
 ```
+
+以上所有函数返回值：成功 `0`，失败 `-1`。
 
 ```c
 // 11_chmod.c
@@ -934,6 +979,8 @@ int link(const char *oldpath, const char *newpath);     // 创建硬链接
 int symlink(const char *oldpath, const char *newpath);  // 创建软链接（符号链接）
 ```
 
+**返回值**：成功 `0`，失败 `-1`。
+
 | | 硬链接 | 软链接 |
 |------|------|------|
 | inode | 相同 | 不同 |
@@ -944,12 +991,12 @@ int symlink(const char *oldpath, const char *newpath);  // 创建软链接（符
 ### 11.5 工作目录操作
 
 ```c
-int chdir(const char *path);                 // 切换工作目录
-int fchdir(int fd);                          // 通过 fd 切换
+int chdir(const char *path);                 // 切换工作目录，成功 0，失败 -1
+int fchdir(int fd);                          // 通过 fd 切换，成功 0，失败 -1
 
-char *getcwd(char *buf, size_t size);        // 获取当前路径（到 buf）
+char *getcwd(char *buf, size_t size);        // 获取当前路径，成功返回 buf，失败 NULL
 char *getwd(char *buf);                      // 同上（已废弃）
-char *get_current_dir_name(void);            // malloc 返回路径（需 free）
+char *get_current_dir_name(void);            // malloc 返回路径，失败 NULL（需 free）
 ```
 
 ```c
@@ -965,7 +1012,7 @@ printf("pwd : %s\n", getcwd(buf, sizeof(buf)));
 
 ```c
 #include <sys/utsname.h>
-int uname(struct utsname *buf);  // 获取系统名称/版本/架构等信息
+int uname(struct utsname *buf);  // 获取系统名称/版本/架构等信息，成功 0，失败 -1
 ```
 
 ---
@@ -977,9 +1024,9 @@ int uname(struct utsname *buf);  // 获取系统名称/版本/架构等信息
 ```c
 #include <dirent.h>
 
-DIR *opendir(const char *name);         // 打开目录
-int closedir(DIR *dirp);                // 关闭目录
-struct dirent *readdir(DIR *dirp);      // 读取目录项（每次返回一项）
+DIR *opendir(const char *name);         // 打开目录，成功返回目录流指针，失败 NULL
+int closedir(DIR *dirp);                // 关闭目录，成功 0，失败 -1
+struct dirent *readdir(DIR *dirp);      // 读取目录项，成功返回 dirent*，结束/失败返回 NULL
 ```
 
 ### 12.2 struct dirent 结构体
