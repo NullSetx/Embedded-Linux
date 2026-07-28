@@ -1,0 +1,234 @@
+
+
+windows : 192.168.2.106
+
+
+
+用户帐号信息文件：/etc/passwd
+用户密码信息文件：/etc/shadow => md6
+	明文 => 暗文
+用户组信息文件	: /etc/group
+用户组密码文件	：/etc/gshadow
+
+useradd + username		添加用户
+userdel -r username		删除用户
+passwd + username		设置密码
+修改用户信息：usermod
+
+
+注意：
+	创建用户的时候会创建一个同名的组
+	创建的用户如果未设置密码，则这个用户不可以登录
+
+groupadd + groupname	创建组
+gpasswd + groupname		组设置密码
+
+---------------------------------------------------
+权限：
+	r : 表示只读
+	w : 表示只写
+	x : 表示可执行
+
+特权：
+	S_ISUID    0004000   set UID bit		属主
+	S_ISGID    0002000   set-group-ID bit (see below) 属组
+	S_ISVTX    0001000   sticky bit (see below) 其他用户
+属主：
+	文件：二进制可执行文件
+		如果指定这个特权，则其他用户可执行当前用户的指令
+	目录：不适用
+	案例：
+		[root@www 2026-07-28]# ll /sbin/fdisk 
+		-rwxr-xr-x. 1 root root 112140 8月   6 2013 /sbin/fdisk
+		[root@www 2026-07-28]# chmod 04755 /sbin/fdisk 
+		[root@www 2026-07-28]# ll /sbin/fdisk 
+		-rwsr-xr-x. 1 root root 112140 8月   6 2013 /sbin/fdisk
+
+		or
+		chmod u+s filename
+
+属组：
+	文件：不适用
+	目录：有效
+	
+	指定权限：
+	[root@www 2026-07-28]# ll -d /share/
+	drwxr-xrwx 2 root root 4096 7月  28 09:10 /share/
+	[root@www 2026-07-28]# chmod 02757 /share/
+	[root@www 2026-07-28]# ll -d /share/
+	drwxr-srwx 2 root root 4096 7月  28 09:10 /share/
+
+	or:
+	chmod g+s dirname
+
+
+其他用户
+	文件：不适用
+	目录：有效
+	
+	案例：
+	[root@www 2026-07-28]# ll -d /share/
+	drwxr-xr-x 2 root root 4096 7月  28 09:18 /share/
+	[root@www 2026-07-28]# chmod o+w /share/
+	[root@www 2026-07-28]# ll -d /share/
+	drwxr-xrwx 2 root root 4096 7月  28 09:18 /share/
+	[root@www 2026-07-28]# chmod 01757 /share/
+	[root@www 2026-07-28]# ll -d /share/
+	drwxr-xrwt 2 root root 4096 7月  28 09:18 /share/
+
+
+	chmod o+t dirname
+
+======================================
+fork
+	父进程 => malloc
+	子进程 => access => free
+
+	父进程 => heap ? 
+
+=====================================
+一段程序，至少包括一个进程，而一个进程至少包括一个线程
+进程退出 8种方式
+5种正常退出
+	1> : 从main中调用return 
+	2> : 调用exit()
+		void exit(int status);
+	3> : 调用_exit or _Exit()
+	4> : 最后一个线程调用pthread_exit()
+	5> : 最后一个线程对退出做出正常响应。
+
+3种异常退出
+	1> 调用abort()
+	2> 接受到信号后的默认响应（终止）
+	3> 最后一个线程对请求退出取消响应。
+
+
+========================================
+return 和 exit区别？
+1> return 是关键子 exit()是函数
+2> return 的退出是语言级别的，exit的退出是系统级别
+	进程是系统资源管理最小单位
+3> return 的退出是把控制权交给调用函数
+	exit 的退出是把控制权交给系统
+4> return 的退出表示堆栈的返回
+	exit 的退出表示整个空间的销毁。
+
+==============================
+exit 和 _exit 的区别
+	exit 退出会刷新缓冲区     会做清理性工作
+	_exit 退出不会刷新缓冲区	不会做
+
+退出清理函数
+	int atexit(void (*function)(void));
+
+	注册顺序和销毁是相反的
+
+练习：
+	int **p = NULL;
+	//申请：由高到低
+	//释放：由低到高
+
+	free_01() => p
+	free_02() => *p
+
+
+
+
+进程等待
+	pid_t wait(int *status);//表示等待任意子进程的退出
+	参数：表示子进程退出状态
+
+	pid_t waitpid(pid_t pid, int *status, int options);
+
+	< -1   meaning wait for any child process whose process group
+	ID is equal to the absolute value of pid.
+			等待指定进程组绝对值的任意子进程
+	-1     meaning wait for any child process.
+			等待任意一个子进程
+	0      meaning wait for any child process whose process group
+	ID is equal to that of the calling process.
+			等待同一个组（父进程一致）中的任意子进程
+	> 0    meaning wait for the child whose process ID  is  equal
+	to the value of pid.
+			指定等待进程号是pid的进程
+
+	option : 表示标志位
+		0 : 阻塞
+		WNOWAIT ： 取消阻塞
+
+练习：
+	求素数（质数）只能被1和本身整除的数就是素数
+	3000 ~ 6000 共有多少个素数
+
+	10个进程求
+
+==========================================
+孤儿进程：
+	就是父进程创建子进程，父进程运行结束，而子进程处于运行的状态，则则会个子进程就变成孤儿进程。则被1号进程收养。
+
+僵尸进程：
+	父进程创建子进程，子进程运行结束，而父进程处于忙的状态，则这个子进程就编程僵尸进程，且僵尸进程是杀不死的
+
+守护进程：
+	就是一直运行于后台，用于接受用户指令，接受到指令指向响应操作。
+	1> 孤儿进程
+	2> 创建一个新的会话
+		1 摆脱原终端影响
+		2 摆脱原进程组的影响
+		3 摆脱原会话的影响
+
+获取进程组号id
+	pid_t getpgid(pid_t pid);
+	pid_t getpgrp(void);                /* POSIX.1 version */
+	pid_t getpgrp(psid_t pid);          /* BSD version */
+
+设置进程组
+	int setpgid(pid_t pid, pid_t pgid);
+	int setpgrp(void);                  /* System V version */
+	int setpgrp(pid_t pid, pid_t pgid); /* BSD version */
+会话：
+	pid_t getsid(pid_t pid);
+
+设置：
+	pid_t setsid(void);
+
+	3> 关闭文件描述符
+	4> 切换工作目录到/下
+	5> 设置umask值为0
+	6> 接受到信号退出
+
+int daemon(int nochdir, int noclose);
+
+====================================
+获取CPU资源
+	int getrlimit(int resource, struct rlimit *rlim);
+	第一个参数：表示获取资源
+		RLIMIT_NOFILE	：表示获取文件描述符资源
+		RLIMIT_STACK	：表示栈空间资源
+	第二个参数：表示资源结构体
+	struct rlimit {
+		rlim_t rlim_cur;  /* Soft limit */ 软资源限额
+		rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */硬资源限额
+	};
+	返回值：
+		成功：0
+		失败：-1
+	int setrlimit(int resource, const struct rlimit *rlim);
+	
+=========================================
+homework:
+	1 实现守护进程，并1秒钟想文件中写入一行信息
+	写入100行后退出守护进程。
+
+==================================================	
+
+
+
+
+
+
+
+
+
+
+

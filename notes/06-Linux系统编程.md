@@ -8,7 +8,8 @@
 
 | 日期 | 章节 | 更新内容 |
 |------|------|----------|
-| 2026-07-27 | 第7-14章 | sys IO综合（cp实现、文件类型位运算查表）、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |
+| 2026-07-28 | 第15-20章 | 作业回顾（tree实现、加密解密）、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |
+| 2026-07-27 | 第7-14章 | sys IO综合（cp实现、文件类型位运算查表）、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |
 | 2026-07-25 | 第1-6章 | 新建笔记：系统编程概述、标准IO回顾、sys IO（open/close/read/write/lseek）、文件描述符与dup/dup2/fcntl、非阻塞IO、文件权限与umask、stat/lstat文件属性、文件类型检测、课后作业 |
 
 ---
@@ -1212,6 +1213,455 @@ if (fork() == 0) {
 
 ---
 
+## 第15章 作业回顾与用户管理
+
+### 15.1 实现 tree 命令
+
+递归遍历目录树，用 `static int lev` 控制缩进层级，`chdir` 进入子目录。
+
+```c
+// 01_tree.c — 递归实现 tree
+void my_tree(const char *path)
+{
+    DIR *dir = NULL;
+    struct dirent *d = NULL;
+    static int lev = 0;          // 当前层级（static 跨递归保持）
+
+    dir = opendir(path);
+    if (dir == NULL) return;
+
+    chdir(path);                 // 进入目标目录
+
+    while ((d = readdir(dir)) != NULL) {
+        if (d->d_name[0] == '.') continue;  // 跳过隐藏文件
+        for (int i = 0; i < lev; i++)
+            printf("|   ");
+        printf("|-- %s\n", d->d_name);
+
+        if (d->d_type == DT_DIR) {
+            lev++;
+            my_tree(d->d_name);  // 递归进入子目录
+            lev--;
+        }
+    }
+    chdir("..");                 // 返回上级目录
+    closedir(dir);
+}
+```
+
+### 15.2 加密解密算法
+
+每字节高4位与低4位交换，**加密和解密是同一个操作**（对称可逆）。
+
+```c
+// 02_my_crypt.c — 高4位 ↔ 低4位
+unsigned char my_crypt(unsigned char old, unsigned char *new)
+{
+    if (new == NULL)
+        return ((old & 0xf0) >> 4) | ((old & 0x0f) << 4);
+    else
+        *new = ((old & 0xf0) >> 4) | ((old & 0x0f) << 4);
+}
+
+// 'h' = 0110 1000 → 密文 = 1000 0110 (再调用一次即解密还原)
+```
+
+### 15.3 用户管理命令
+
+| 命令 | 作用 |
+|------|------|
+| `useradd username` | 添加用户（自动创建同名组） |
+| `userdel -r username` | 删除用户（-r 删除家目录） |
+| `passwd username` | 设置用户密码 |
+| `usermod` | 修改用户信息 |
+| `groupadd groupname` | 创建用户组 |
+| `gpasswd groupname` | 设置组密码 |
+
+> 未设置密码的用户不能登录。用户帐号 `/etc/passwd`，密码 `/etc/shadow`，组 `/etc/group`，组密码 `/etc/gshadow`。
+
+### 15.4 特殊权限位
+
+| 宏 | 八进制值 | 含义 | 适用 |
+|----|----------|------|------|
+| `S_ISUID` | 0004000 | Set UID — 其他用户执行时获得属主权限 | 可执行文件 |
+| `S_ISGID` | 0002000 | Set GID — 目录内新文件继承目录属组 | 目录 |
+| `S_ISVTX` | 0001000 | Sticky — 仅文件所有者可删除自己文件 | 目录（如 /tmp） |
+
+```bash
+# SUID: 属主 x → s
+chmod u+s filename    # 或 chmod 4755 filename
+# SGID: 属组 x → s
+chmod g+s dirname     # 或 chmod 2755 dirname
+# Sticky: 其他 x → t
+chmod o+t dirname     # 或 chmod 1755 dirname
+```
+
+---
+
+## 第16章 进程退出
+
+### 16.1 一段程序的结构
+
+一段程序 ≥ 1 个进程，一个进程 ≥ 1 个线程。
+
+### 16.2 进程退出 8 种方式
+
+**5 种正常退出**：
+
+| 方式 | 说明 |
+|------|------|
+| `return` (from main) | 语言级别，控制权交给调用函数，堆栈返回 |
+| `exit(status)` | 系统级别，控制权交给系统，**刷新缓冲区**，做清理 |
+| `_exit(status)` / `_Exit(status)` | 系统级别，**不刷新缓冲区**，不做清理 |
+| `pthread_exit()` | 最后一个线程调用 |
+| 最后一个线程正常响应 | 线程自然结束 |
+
+**3 种异常退出**：
+
+| 方式 | 说明 |
+|------|------|
+| `abort()` | 发送 `SIGABRT`(6) 信号终止 |
+| 接收到信号后默认响应 | 如 `kill(pid, signo)` |
+| 最后一个线程取消响应 | 线程被取消 |
+
+### 16.3 return vs exit
+
+| | return | exit |
+|------|------|------|
+| 性质 | 关键字 | 函数 |
+| 级别 | 语言级别 | 系统级别 |
+| 控制权 | 交给调用函数 | 交给系统 |
+| 资源 | 堆栈返回/释放 | 整个进程空间销毁 |
+
+```c
+// 05_return.c — return 只结束当前函数
+void test(void) {
+    printf("this is test!\n");
+    return;     // test() 结束，main 继续
+}
+// 输出: main start → this is test! → main end
+
+// 06_exit.c — exit 直接结束进程
+void test(void) {
+    printf("this is test!\n");
+    exit(0);    // 整个进程结束
+}
+// 输出: main start → this is test! （不会打印 main end）
+```
+
+### 16.4 exit vs _exit
+
+```c
+// 07_exit.c
+printf("main start ...");     // 无 \n，数据在缓冲区
+exit(0);                       // 会刷新缓冲区 → 输出上面的内容
+_exit(0);                      // 不刷新缓冲区 → 上面内容丢失
+```
+
+| | exit | _exit |
+|------|------|------|
+| 刷新缓冲区 | 会 | 不会 |
+| 清理工作 | 做（atexit 回调等） | 不做 |
+
+### 16.5 atexit — 退出清理函数
+
+```c
+int atexit(void (*function)(void));
+```
+
+**返回值**：成功 `0`，失败非 `0`。
+
+注册函数在进程正常退出时自动调用，**注册顺序与执行顺序相反**（栈结构，先注册后执行）。
+
+```c
+// 08_atexit.c
+atexit(test);     // 3. 最后执行
+atexit(hello);    // 2. 第二执行
+atexit(world);    // 1. 先执行
+
+// 输出顺序: world! → hello! → 6 => hello world!
+```
+
+**应用：释放多级指针**（先释放内层，后释放外层）：
+
+```c
+// 09_free.c — 注册顺序 = 申请: 由高到低；执行顺序 = 释放: 由低到高
+int **p = NULL;
+p = (int **)malloc(sizeof(int *));   // 先申请外层
+*p = (int *)malloc(sizeof(int));     // 再申请内层
+
+atexit(free_01);   // free(p)    —— 后注册，后执行
+atexit(free_02);   // free(*p)   —— 先注册，先执行（先释放内层）
+```
+
+### 16.6 abort — 异常终止
+
+```c
+#include <stdlib.h>
+void abort(void);   // 发送 SIGABRT(6)，无返回值
+```
+
+```c
+// 11_abort.c
+abort();             // 进程异常终止
+printf("world!\n");  // 不会执行
+```
+
+### 16.7 kill — 发送信号
+
+```c
+#include <signal.h>
+int kill(pid_t pid, int sig);
+```
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 12_kill.c — 子进程杀死父进程
+if (fork() == 0) {
+    kill(getppid(), 6);    // 向父进程发送 SIGABRT
+}
+```
+
+---
+
+## 第17章 进程等待
+
+### 17.1 wait / waitpid
+
+```c
+#include <sys/wait.h>
+
+pid_t wait(int *status);       // 等待任意子进程退出
+pid_t waitpid(pid_t pid, int *status, int options);
+```
+
+**返回值**：成功返回退出的子进程 PID，失败 `-1`。
+
+**waitpid 的 pid 参数**：
+
+| pid 值 | 等待对象 |
+|--------|----------|
+| `< -1` | 进程组 ID = `|pid|` 的任意子进程 |
+| `-1` | 任意子进程（等同 wait） |
+| `0` | 与父进程同组的任意子进程 |
+| `> 0` | 指定 PID 的子进程 |
+
+**options**：`0` 阻塞等待，`WNOHANG` 非阻塞。
+
+### 17.2 退出状态宏
+
+| 宏 | 作用 |
+|----|------|
+| `WIFEXITED(status)` | 正常退出时为真 |
+| `WEXITSTATUS(status)` | 获取退出码（低 8 位，0~255） |
+| `WIFSIGNALED(status)` | 信号终止时为真 |
+| `WTERMSIG(status)` | 获取终止信号编号 |
+
+```c
+// 14_wait.c
+int status;
+wait(&status);
+
+if (WIFEXITED(status))
+    printf("正常退出, exit code: %d\n", WEXITSTATUS(status));
+if (WIFSIGNALED(status))
+    printf("信号终止, signal: %d\n", WTERMSIG(status));
+```
+
+### 17.3 等待多个子进程
+
+```c
+// 15_mul_fork.c — 创建 10 个子进程，逐一等待
+for (i = 0; i < MAX; i++) {
+    if (fork() == 0) {
+        printf("child: pid = %d ppid = %d\n", getpid(), getppid());
+        exit(0);           // 子进程立即退出，防止创建孙子进程
+    }
+}
+
+for (i = 0; i < MAX; i++)
+    wait(NULL);            // 回收 10 个子进程
+```
+
+> **关键**：子进程执行完任务后立即 `exit`，否则子进程会继续 `for` 循环创建新进程。
+
+### 17.4 多进程求素数
+
+```c
+// 16_prime.c — 10 个进程并行计算 3000~6000 的素数个数
+#define NUM 10
+#define MIN 3000
+#define MAX 6000
+#define STEP (MAX - MIN) / NUM
+
+// 每个子进程计算一个区间，结果通过 exit 返回
+for (i = 0; i < NUM; i++) {
+    if (fork() == 0) {
+        exit(count_prime(MIN + i * STEP, MIN + (i + 1) * STEP));
+    }
+}
+
+// 父进程汇总
+for (i = 0; i < NUM; i++) {
+    wait(&status);
+    if (WIFEXITED(status))
+        count += WEXITSTATUS(status);
+}
+```
+
+> exit 返回值只有低 8 位有效（0~255），如果素数个数超过 255 需要用文件或其他 IPC 方式汇总。
+
+---
+
+## 第18章 进程特殊状态
+
+### 18.1 孤儿进程
+
+父进程先结束，子进程仍在运行 → 子进程变为**孤儿进程**，被 **1 号进程（init）收养**。
+
+```c
+// 17_orphan.c
+if (fork() == 0) {
+    while (1) {
+        printf("child: pid = %d ppid = %d\n", getpid(), getppid());
+        usleep(100000);
+    }
+}
+// 父进程立即退出，子进程的 ppid 变为 1
+```
+
+### 18.2 僵尸进程
+
+子进程运行结束，但父进程忙（未调用 wait 回收）→ 子进程变为**僵尸进程**。
+
+- 僵尸进程只保留进程表项，不占用内存
+- 僵尸进程**杀不死**（已经死了，只是没被回收）
+- 大量僵尸进程会耗尽 PID 资源
+
+```c
+// 18_zombie.c
+if (fork() == 0) {
+    printf("child: %d\n", getpid());
+    exit(0);                  // 子进程退出
+}
+while (1) usleep(100000);     // 父进程忙，不 wait → 僵尸
+```
+
+> `ps aux | grep Z` 可查看僵尸进程。
+
+### 18.3 守护进程（daemon）
+
+一直运行于后台，接收用户指令后执行响应操作。
+
+**6 个创建步骤**：
+
+| 步骤 | 操作 | 目的 |
+|------|------|------|
+| 1 | fork 并退出父进程 | 子进程变孤儿 |
+| 2 | `setsid()` | 创建新会话，摆脱原终端/进程组/会话 |
+| 3 | 关闭所有 fd (0~1023) | 释放无用资源 |
+| 4 | `chdir("/")` | 切换工作目录到根（防止卸载） |
+| 5 | `umask(0)` | 重置权限掩码 |
+| 6 | 信号处理 | 接收信号后优雅退出 |
+
+```c
+// 19_daemon.c — 手动实现守护进程
+if (fork() != 0) exit(0);                    // 1. 创建孤儿进程
+setsid();                                    // 2. 创建新会话
+
+for (int i = 0; i < 1024; i++) close(i);     // 3. 关闭文件描述符
+
+chdir("/");                                  // 4. 切换到根目录
+umask(0);                                    // 5. 重置 umask
+
+// 6. 守护进程主循环...
+```
+
+**系统提供的 daemon 函数**：
+
+```c
+#include <unistd.h>
+int daemon(int nochdir, int noclose);  // 成功 0，失败 -1
+// nochdir=0: 切换到 /
+// noclose=0: 关闭所有 fd 并重定向 stdin/stdout/stderr 到 /dev/null
+```
+
+```c
+// 21_sys_daemon.c — 一行创建守护进程
+daemon(0, 0);
+```
+
+---
+
+## 第19章 进程组与资源限制
+
+### 19.1 进程组与会话
+
+```c
+#include <unistd.h>
+
+// 获取进程组 ID
+pid_t getpgid(pid_t pid);      // 获取指定进程的进程组，成功返回 pgid，失败 -1
+pid_t getpgrp(void);           // 获取当前进程组，总是成功
+
+// 设置进程组
+int setpgid(pid_t pid, pid_t pgid);  // 成功 0，失败 -1
+
+// 会话
+pid_t getsid(pid_t pid);            // 获取会话 ID，成功返回 sid，失败 -1
+pid_t setsid(void);                 // 创建新会话，成功返回新 sid，失败 -1
+```
+
+`sedsid()` 的作用：摆脱原终端、原进程组、原会话的影响。
+
+### 19.2 获取/设置资源限制
+
+```c
+#include <sys/time.h>
+#include <sys/resource.h>
+
+int getrlimit(int resource, struct rlimit *rlim);
+int setrlimit(int resource, const struct rlimit *rlim);
+```
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+struct rlimit {
+    rlim_t rlim_cur;  // 软限制（当前生效值）
+    rlim_t rlim_max;  // 硬限制（软限制的上限）
+};
+```
+
+**常用 resource**：
+
+| 宏 | 含义 |
+|----|------|
+| `RLIMIT_NOFILE` | 最大打开文件描述符数 |
+| `RLIMIT_STACK` | 栈空间大小 |
+
+```c
+// 20_getrlimit.c — 查看并修改最大 fd 数
+struct rlimit rt;
+getrlimit(RLIMIT_NOFILE, &rt);
+printf("cur: %d  max: %d\n", rt.rlim_cur, rt.rlim_max);  // 默认 1024
+
+rt.rlim_cur = 3;                         // 限制为 3 个 fd
+setrlimit(RLIMIT_NOFILE, &rt);
+// 之后最多只能打开 3 个文件（0,1,2 已被占用）
+```
+
+---
+
+## 第20章 课后作业
+
+| 序号 | 作业 | 要点 |
+|------|------|------|
+| 1 | 实现守护进程 | 每秒向文件写一行（含时间戳），写满 100 行后退出 |
+
+---
+
 ## 本章小结
 
 ```
@@ -1230,4 +1680,8 @@ sys IO 综合练习   ███████████████████�
 文件系统操作      ████████████████████
 目录操作          ████████████████████
 进程基础/fork     ████████████████████
+进程退出机制      ████████████████████
+进程等待/wait     ████████████████████
+孤儿/僵尸/守护    ████████████████████
+进程组/资源限制   ████████████████████
 ```
