@@ -8,7 +8,8 @@
 
 | 日期 | 章节 | 更新内容 |
 |------|------|----------|
-| 2026-07-28 | 第15-20章 | 作业回顾（tree实现、加密解密）、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |
+| 2026-07-29 | 第21-26章 | 作业回顾（守护进程）、vfork与fork对比、信号（kill/signal/SIG_DFL/SIG_IGN/SIG_ERR、alarm闹钟、setitimer定时器）、exec族函数（6个函数+system+environ）、匿名管道pipe（父子/兄弟进程通讯、SIGPIPE、管道容量64K）、有名管道fifo（mkfifo+access）、课后作业 |
+| 2026-07-28 | 第15-20章 | 作业回顾（tree实现、加密解密）、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |
 | 2026-07-27 | 第7-14章 | sys IO综合（cp实现、文件类型位运算查表）、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |
 | 2026-07-25 | 第1-6章 | 新建笔记：系统编程概述、标准IO回顾、sys IO（open/close/read/write/lseek）、文件描述符与dup/dup2/fcntl、非阻塞IO、文件权限与umask、stat/lstat文件属性、文件类型检测、课后作业 |
 
@@ -1662,21 +1663,564 @@ setrlimit(RLIMIT_NOFILE, &rt);
 
 ---
 
+## 第21章 vfork
+
+### 21.1 作业回顾：守护进程
+
+```c
+// 01_daemon.c — daemon + 定时写文件（100行后退出）
+int count = 0;
+daemon(0, 0);                       // 创建守护进程
+
+fd = creat("/tmp/test", 0644);
+while (count < 100) {
+    write(fd, "hello\n", 6);
+    count++;
+    usleep(1000000);                // 1秒
+}
+close(fd);
+```
+
+### 21.2 vfork vs fork
+
+```c
+pid_t vfork(void);  // 创建子进程，成功返回同 fork，失败返回 -1
+```
+
+| | fork | vfork |
+|------|------|-------|
+| 内存空间 | **独享**（写时复制 COW） | **共享**父进程地址空间 |
+| 执行顺序 | 父子并发，不确定 | 子进程**优先**运行，父进程阻塞 |
+| 子进程 return | 可以 | **不能**（会导致父进程崩溃），必须用 `_exit`/`exit` |
+
+```c
+// 02_vfork.c — vfork 共享内存验证
+int count = 100;
+
+if (vfork() == 0) {
+    count = 200;                         // 修改的是父进程的 count!
+    printf("child  => count : %d\n", count);  // 200
+    exit(0);                             // 必须用 exit!
+}
+printf("parent => count : %d\n", count);      // 200（被子进程改了!）
+```
+
+> vfork 子进程必须调用 `_exit()` 或 `exit()`，调用 `return` 会导致父进程访问已释放的栈帧而崩溃。
+
+---
+
+## 第22章 信号（Signal）
+
+信号是**软中断机制**，用于进程间异步通知。信号默认处理方式都是**终止进程**。
+
+### 22.1 常用信号
+
+`kill -l` 查看所有信号（1~64）。
+
+| 信号 | 编号 | 触发方式 | 默认行为 |
+|------|------|----------|----------|
+| `SIGHUP` | 1 | Ctrl+\ | 终止 |
+| `SIGINT` | 2 | Ctrl+C | 终止 |
+| `SIGQUIT` | 3 | Ctrl+\\ | 终止+core dump |
+| `SIGABRT` | 6 | `abort()` | 终止+core dump |
+| `SIGKILL` | 9 | `kill -9` | **不可捕捉/忽略** |
+| `SIGALRM` | 14 | `alarm()` 超时 | 终止 |
+| `SIGPIPE` | 13 | 管道读端关闭时写 | 终止 |
+| `SIGSTOP` | 19 | | **不可捕捉/忽略**（暂停） |
+
+### 22.2 kill — 发送信号
+
+```c
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+```
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 03_kill.c
+kill(pid, SIGKILL);    // 杀死指定进程
+kill(pid, SIGINT);     // 发送 Ctrl+C
+kill(getpid(), signo); // 给自己发信号
+```
+
+### 22.3 signal — 捕捉/设置信号处理
+
+```c
+typedef void (*sighandler_t)(int);
+
+sighandler_t signal(int signum, sighandler_t handler);
+```
+
+| handler 值 | 含义 |
+|------------|------|
+| `SIG_DFL` | 恢复默认处理 |
+| `SIG_IGN` | 忽略信号 |
+| 自定义函数 `void func(int sig)` | 信号到达时回调 |
+
+**返回值**：成功返回**前一个**处理函数的地址，失败返回 `SIG_ERR`。
+
+```c
+// 04_signal.c — 捕捉 SIGINT (Ctrl+C)
+void hello(int sig) {
+    printf("hello! sig=%d\n", sig);
+}
+
+signal(SIGINT, hello);   // 注册自定义处理 → Ctrl+C 不再终止
+// 5秒后恢复默认
+sleep(5);
+signal(SIGINT, SIG_DFL); // 恢复默认 → Ctrl+C 终止
+```
+
+### 22.4 哪些信号不可改变
+
+```c
+// 05_check.c — 遍历 1~64，signal 返回 SIG_ERR 的即不可捕捉
+for (i = 1; i <= 64; i++) {
+    if (signal(i, SIG_DFL) == SIG_ERR)
+        printf("%d ", i);     // 9(SIGKILL) 和 19(SIGSTOP) 不可改变
+}
+```
+
+### 22.5 alarm — 闹钟信号
+
+```c
+unsigned int alarm(unsigned int seconds);
+```
+
+`seconds` 秒后向进程发送 `SIGALRM`。若参数为 `0` 则取消之前的闹钟。**返回值**：前一个闹钟的剩余秒数。
+
+```c
+// 06_alarm.c — 循环闹钟
+void dididi(int sig) {
+    printf("sig : %d didi...\n", sig);
+    alarm(1);                 // 重新定闹钟（循环）
+}
+
+signal(SIGALRM, dididi);
+alarm(3);                     // 3秒后第一次触发
+
+while (count--)
+    pause();                  // 暂停等待任意信号，收到信号后返回
+```
+
+> `pause()` 使进程休眠，直到收到一个信号。
+
+### 22.6 setitimer — 精确定时器
+
+```c
+#include <sys/time.h>
+
+int getitimer(int which, struct itimerval *curr_value);
+int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
+```
+
+**返回值**：成功 `0`，失败 `-1`。
+
+**which 定时器类型**：
+
+| 宏 | 信号 | 计时方式 |
+|----|------|----------|
+| `ITIMER_REAL` | `SIGALRM`(14) | 真实时间（wall clock），可 sleep 等待 |
+| `ITIMER_VIRTUAL` | `SIGVTALRM`(26) | 用户态 CPU 时间，必须**轮询** |
+| `ITIMER_PROF` | `SIGPROF`(27) | 用户态+内核态 CPU 时间，必须轮询 |
+
+```c
+struct itimerval {
+    struct timeval it_interval;  // 循环间隔时间
+    struct timeval it_value;     // 第一次触发时间
+};
+
+struct timeval {
+    long tv_sec;                 // 秒
+    long tv_usec;                // 微秒（1/1000 秒）
+};
+```
+
+```c
+// 07_setitimer.c — 机器时间定时器（可 sleep）
+struct itimerval it;
+signal(SIGALRM, didi);                 // 捕捉闹钟信号
+
+it.it_value.tv_sec = 3;                // 3秒后第一次触发
+it.it_value.tv_usec = 100;
+it.it_interval.tv_sec = 0;             // 之后每 0.1 秒循环
+it.it_interval.tv_usec = 100000;
+
+setitimer(ITIMER_REAL, &it, NULL);
+getchar();                             // sleep 方式等待
+```
+
+```c
+// 08_mul_setitimer.c — 同时使用 ITIMER_REAL + ITIMER_VIRTUAL
+signal(SIGALRM, didi);                 // ITIMER_REAL → SIGALRM
+signal(SIGVTALRM, world);              // ITIMER_VIRTUAL → SIGVTALRM
+
+// 定时器1: 真实时间，每1秒
+it.it_interval.tv_sec = 1;
+setitimer(ITIMER_REAL, &it, NULL);
+
+// 定时器2: 用户态时间，每2秒
+it1.it_interval.tv_sec = 2;
+setitimer(ITIMER_VIRTUAL, &it1, NULL);
+
+while (1);                             // 必须轮询（VIRTUAL 不能 sleep）
+```
+
+> `ITIMER_VIRTUAL` 和 `ITIMER_PROF` 必须用 `while(1)` 轮询，不能用 sleep/getchar 等待。
+
+---
+
+## 第23章 exec 族函数
+
+exec 族函数用新程序**替换**当前进程映像（PID 不变），**不创建新进程**。
+
+### 23.1 system — 执行 shell 命令
+
+```c
+#include <stdlib.h>
+int system(const char *command);  // 内部 fork+exec，返回命令状态
+```
+
+```c
+// exec/01_demo.c
+system("clear");
+system("ls -l -a");
+// system 会阻塞等待命令执行完毕
+```
+
+### 23.2 环境变量
+
+```c
+extern char **environ;   // 全局环境变量指针
+
+// 或通过 main 第三个参数获取
+int main(int argc, char *argv[], char **env);
+```
+
+```c
+// exec/03_env.c — 遍历环境变量
+int main(int argc, char *argv[], char **env) {
+    for (int i = 0; env[i] != NULL; i++)
+        printf("%s\n", env[i]);    // 输出所有 NAME=VALUE
+}
+```
+
+### 23.3 exec 6 个函数
+
+```c
+#include <unistd.h>
+
+// l = list（可变参数）, v = vector（数组）, p = PATH 搜索, e = 自定义环境
+int execl(const char *path, const char *arg, ..., NULL);
+int execlp(const char *file, const char *arg, ..., NULL);
+int execle(const char *path, const char *arg, ..., NULL, char *const envp[]);
+int execv(const char *path, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int execve(const char *filename, char *const argv[], char *const envp[]);
+```
+
+**命名规则**：
+
+| 后缀 | 含义 |
+|------|------|
+| `l` | 参数用可变参数列表（list），`NULL` 结尾 |
+| `v` | 参数用字符串数组（vector） |
+| `p` | 从 `PATH` 环境变量搜索可执行文件 |
+| `e` | 可指定自定义环境变量数组 |
+
+**返回值**：只有失败才返回 `-1`（成功则进程被替换，不会返回）。
+
+```c
+// exec/04_exec.c — 6 种调用对比
+execl("/bin/ls", "ls", "-l", "-a", "-i", NULL);
+execlp("ls", "ls", "-l", "-a", "-i", NULL);     // 从 PATH 搜索
+execle("/bin/ls", "ls", "-l", "-a", "-i", NULL, env);
+execv("/bin/ls", ar);                            // ar = {"ls", "-l", "-a", "-i", NULL}
+execvp("ls", ar);
+execve("/bin/ls", ar, env);                      // 最底层，其余5个都是对它的封装
+```
+
+**exec 的重要特点**：
+- 替换整个进程映像，**exec 之后的代码不会执行**（除非 exec 失败）
+- PID 不变，PPID 不变，继承原进程的 fd（除非设置了 FD_CLOEXEC）
+
+### 23.4 自定义环境变量
+
+```c
+// exec/06_my_env.c — 父进程传递自定义环境变量给子程序
+char *my_ar[] = {"hello", "world", "123", "test", NULL};
+char *my_env[] = {"name=tom", "id=100086", "sex=F", NULL};
+
+execve("/path/to/program", my_ar, my_env);
+```
+
+```c
+// exec/05_access_ar_env.c — 子程序读取 argc/argv/env
+for (i = 0; i < argc; i++)
+    printf("argv[%d] = %s\n", i, argv[i]);
+
+for (i = 0; env[i] != NULL; i++)
+    printf("%s\n", env[i]);
+```
+
+### 23.5 管道 + exec 综合：cat /etc/passwd | grep root
+
+```c
+// exec/07_cmd.c — 兄弟进程通过管道 + exec 实现 shell 管道
+int fd[2];
+pipe(fd);
+
+if (fork() == 0) {
+    close(fd[0]);
+    dup2(fd[1], STDOUT_FILENO);          // 标准输出 → 管道写端
+    execlp("cat", "cat", "/etc/passwd", NULL);
+    exit(0);
+}
+
+close(fd[1]);
+wait(NULL);
+dup2(fd[0], STDIN_FILENO);               // 标准输入 → 管道读端
+execlp("grep", "grep", "root", NULL);
+```
+
+---
+
+## 第24章 匿名管道（pipe）
+
+### 24.1 通讯模式
+
+| 模式 | 说明 |
+|------|------|
+| 单工 | 管道只能读或只能写 |
+| **半双工** | 一端固定读、另一端固定写（匿名/有名管道都是半双工） |
+| 全双工 | 一端既可读也可写 |
+
+### 24.2 匿名管道
+
+只能用于**父子进程**或**兄弟进程**之间通讯。
+
+```c
+#include <unistd.h>
+
+int pipe(int pipefd[2]);
+```
+
+- `pipefd[0]`：读端
+- `pipefd[1]`：写端
+- **返回值**：成功 `0`，失败 `-1`
+
+```c
+// pipe/01_creat.c — 创建并查看 fd
+int fd[2];
+pipe(fd);
+printf("fd[0] : %d  fd[1] : %d\n", fd[0], fd[1]);  // 如 fd[0]=3, fd[1]=4
+```
+
+### 24.3 基本读写
+
+```c
+// pipe/02_write.c — 写端写入
+write(fd[1], "hello", 5);
+
+// pipe/03_read.c — 读端读取
+char buf[128];
+read(fd[0], buf, sizeof(buf));
+printf("buf : %s\n", buf);
+```
+
+### 24.4 父子进程管道通讯
+
+```c
+// pipe/04_fork.c — 子进程写 → 父进程读
+pipe(fd);
+
+if (fork() == 0) {
+    close(fd[0]);                  // 子进程关闭读端
+    write(fd[1], "hello", 5);      // 写入
+    close(fd[1]);
+    exit(0);
+}
+
+wait(NULL);
+close(fd[1]);                      // 父进程关闭写端
+read(fd[0], buf, sizeof(buf));     // 读取
+```
+
+### 24.5 管道容量
+
+匿名管道一次最多写入 **64KB** 数据。
+
+```c
+// pipe/05_size.c — 测试管道最大容量
+while (1) {
+    ret = write(fd[1], buf, sizeof(buf));
+    count++;
+    printf("count : %d\n", count);
+    // 写满 64KB 后 write 阻塞
+}
+```
+
+### 24.6 SIGPIPE — 管道异常信号
+
+如果管道读端关闭，写端继续写入 → 触发 `SIGPIPE`(13)。
+
+```c
+// pipe/06_signal.c — 捕捉 SIGPIPE
+signal(SIGPIPE, hello);
+
+if (fork() == 0) {
+    exit(0);                       // 子进程退出，管道的读端随之关闭
+}
+
+close(fd[0]);                      // 父进程也关读端
+sleep(1);
+write(fd[1], "hello", 6);         // 读端不存在 → SIGPIPE
+```
+
+### 24.7 兄弟进程通讯：cat /etc/passwd | grep root
+
+```c
+// pipe/my_pipe.c — 两个子进程通过管道通讯
+pipe(fd);
+
+// 第一个子进程：执行 cat，输出重定向到管道写端
+if (fork() == 0) {
+    dup2(fd[1], STDOUT_FILENO);
+    close(fd[0]);
+    execl("/bin/cat", "cat", "/etc/passwd", NULL);
+    exit(0);
+}
+
+// 第二个子进程：执行 grep，输入重定向到管道读端
+if (fork() == 0) {
+    dup2(fd[0], STDIN_FILENO);
+    close(fd[1]);
+    execl("/bin/grep", "grep", "root", NULL);
+    exit(0);
+}
+
+// 父进程关闭两端，等待所有子进程
+close(fd[0]); close(fd[1]);
+wait(NULL); wait(NULL);
+```
+
+---
+
+## 第25章 有名管道（FIFO）
+
+有名管道通过**管道文件**通讯，可实现**任意进程**之间的通讯。
+
+### 25.1 通讯流程
+
+1. 创建管道文件（`mkfifo`）
+2. 判断文件是否存在（`access`）
+3. 打开文件（`open`）
+4. 读写（`read`/`write`）
+5. 关闭（`close`）
+
+### 25.2 access — 检查文件存在/权限
+
+```c
+#include <unistd.h>
+int access(const char *pathname, int mode);
+```
+
+| mode | 含义 |
+|------|------|
+| `F_OK` | 检查文件是否存在 |
+| `R_OK` | 检查读权限 |
+| `W_OK` | 检查写权限 |
+| `X_OK` | 检查执行权限 |
+
+**返回值**：成功 `0`，失败 `-1`。
+
+### 25.3 mkfifo — 创建有名管道
+
+```c
+#include <sys/stat.h>
+int mkfifo(const char *pathname, mode_t mode);
+```
+
+**返回值**：成功 `0`，失败 `-1`。如果文件已存在则创建失败。
+
+```c
+// fifo/01_creat.c — 先判断再创建
+if (access(argv[1], F_OK) != 0) {
+    mkfifo(argv[1], 0644);           // 文件不存在才创建
+}
+```
+
+### 25.4 同一进程读写
+
+```c
+// fifo/02_data.c — 同进程内通过 FIFO 读写
+fd = open(argv[1], O_RDWR);
+
+if (fork() == 0) {
+    write(fd, "hello", 6);           // 子进程写
+    exit(0);
+}
+wait(NULL);
+read(fd, buf, sizeof(buf));          // 父进程读
+printf("buf : %s\n", buf);
+
+close(fd);
+unlink(argv[1]);                     // 删除管道文件
+```
+
+### 25.5 独立进程通讯（send / recv）
+
+**发送端**：
+
+```c
+// fifo/03_send.c
+fd = open(argv[1], O_RDWR);
+while (1) {
+    GETLINES("input send data : ", buf);
+    write(fd, buf, strlen(buf) + 1);
+    if (strcmp(buf, "exit") == 0) break;
+}
+close(fd);
+unlink(argv[1]);
+```
+
+**接收端**：
+
+```c
+// fifo/04_recv.c
+fd = open(argv[1], O_RDWR);
+while (1) {
+    read(fd, buf, sizeof(buf));
+    printf("message : %s\n", buf);
+    if (strcmp(buf, "exit") == 0) break;
+}
+close(fd);
+unlink(argv[1]);
+```
+
+> 两个进程分别运行，通过同一个 FIFO 文件通讯。FIFO 是**半双工**模式，固定一端读一端写。
+
+---
+
+## 第26章 课后作业
+
+| 序号 | 作业 | 要点 |
+|------|------|------|
+| 1 | 封装定时器（链表） | `struct timer_t` 含 time/count_time/data/回调函数指针，用链表管理多个定时任务 |
+| 2 | 一对一聊天（tell） | 用 FIFO 实现两个进程互相收发消息 |
+
+---
+
 ## 本章小结
 
 ```
 Linux系统编程概述  ████████████████████
-标准IO回顾        ████████████████████
 sys IO 读写       ████████████████████
 文件描述符/重定向  ████████████████████
-fcntl/非阻塞IO    ████████████████████
 文件权限/umask    ████████████████████
 stat/文件属性     ████████████████████
-文件类型检测      ████████████████████
-sys IO 综合练习   ████████████████████
-用户与组信息      ████████████████████
-口令加密crypt     ████████████████████
-时间函数          ████████████████████
 文件系统操作      ████████████████████
 目录操作          ████████████████████
 进程基础/fork     ████████████████████
@@ -1684,4 +2228,10 @@ sys IO 综合练习   ███████████████████�
 进程等待/wait     ████████████████████
 孤儿/僵尸/守护    ████████████████████
 进程组/资源限制   ████████████████████
+vfork             ████████████████████
+信号/signal       ████████████████████
+定时器/alarm      ████████████████████
+exec 族函数       ████████████████████
+匿名管道 pipe     ████████████████████
+有名管道 fifo     ████████████████████
 ```

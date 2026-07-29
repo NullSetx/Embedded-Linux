@@ -1,0 +1,230 @@
+
+
+vfork() : 创建进程
+
+fork() : 创建进程
+
+之间区别：
+	1 fork() 创建的进程是独享内存空间
+		vfork() 创建的进程是共享内存空间
+	2 fork() 创建子进程和父进程并发执行。
+		vfork() 创建的子进程优先父进程运行
+	3 fork() 创建子进程还可一调用return 
+		vfork() 创建子进程不能调用return 
+
+======================================
+进程之间通讯
+1信号：
+	软中断机制
+信号源：
+	kill -l
+
+常用信号：
+	SIGHUP	ctrl + \
+	SIGINT	ctrl + c
+	SIGABRT	abort
+	SIGKILL	杀死信号
+	SIGPIPE	管道异常信号
+	SIGALRM	闹钟信号
+
+	信号默认都是终止
+发送信号
+	kill -signum pid  指令
+
+	int kill(pid_t pid, int sig);
+	第一个参数：表示进程号
+	第二个参数：表示信号
+
+捕捉信号
+	typedef void (*sighandler_t)(int);
+	sighandler_t signal(int signum, sighandler_t handler);
+	第一个参数：表示信号值
+	第二个参数：表示对信号处理 3种
+		1 默认: SIG_DFL
+		2 忽略：SIG_IGN
+		3 自定义：void (*sighandler_t)(int)
+	返回值：
+		失败：SIG_ERR
+		成功：前一个自定义函数返回地址
+
+验证：那些信号不可以改变
+
+闹钟信号：
+	unsigned int alarm(unsigned int seconds); 秒数
+
+定时器：
+	int getitimer(int which, struct itimerval *curr_value);
+	int setitimer(int which, const struct itimerval *new_value,
+			struct itimerval *old_value);
+	第一个参数：表示定时器类型 可以睡眠或者轮寻方式
+		ITIMER_REAL ： 表示机器时间
+			SIGALRM => 14 闹钟信号
+
+		后面定时器必须是轮寻的方式等待
+		ITIMER_VIRTUAL	: 表示用户态所花费时间
+			SIGVTALRM => 26 
+		ITIMER_PROF : 表示用户态和系统态时间总和
+			SIGPROF => 27
+	第二个参数：表示时间结构体 => 实例化
+	struct itimerval {
+		循环时间
+		struct timeval it_interval; /* next value */
+		第一次执行时间
+		struct timeval it_value;    /* current value */
+	};
+
+	struct timeval {
+		秒
+		long tv_sec;                /* seconds */
+		微妙(1000) => 0.001
+		long tv_usec;               /* microseconds */
+	};
+
+	第三个参数：上次设定定时器时间 NULL
+
+	返回值：
+		成功：0
+		失败：-1
+
+//=====================================
+管道命令：|
+	前一个命令的输出作为后一个命令输入
+
+管道文件：p
+	mkfifo filename
+管道通讯:
+	就是利用管道传输数据，一端为读段，另一端为写段，且读段和写段是固定的。我们把这种通讯就叫半双工模式
+
+通讯模式3种：
+	1 单工：	管道只能读或者只能写
+	2 半双工：	固定一段只能读而另一端只能写的
+	3 全双工：  一端既可以读也可以写方式
+分类：
+	匿名管道：
+		只能父子进程或者兄弟进程之间通讯
+	有名管道：
+		可以实现任意进程之间通讯
+
+匿名管道
+	1 创建匿名管道
+		int pipe(int pipefd[2]);
+		参数：数组，且只能有两个成员
+			fd[0]:pipefd[0] refers to  the  read
+			fd[1]:pipefd[1]  refers  to the write
+
+		返回值：
+			成功：0
+			失败：-1
+
+	2 读
+		read => fd[0]
+	3 写：
+		write => fd[1]
+
+	4 关闭
+		close
+注意：
+	匿名管道一次最多可以写入64K的数据
+
+	管道异常信号 => 如果一端不在线，则导致管道异常 => SIGPIPE
+
+执行外部命令
+	extern char **environ;
+
+	int execl(const char *path, const char *arg, ...);
+	第一个参数：表示命令路径 （绝对路径）
+	第二个参数：表示命令名
+	...		  : 可变参 给命令做补充
+	NULL	  ： 结束标记
+
+	int execlp(const char *file, const char *arg, ...);
+	int execle(const char *path, const char *arg,
+			..., char * const envp[]);
+	int execv(const char *path, char *const argv[]);
+	int execvp(const char *file, char *const argv[]);
+
+	int execve(const char *filename, char *const argv[],
+	                  char *const envp[]);
+	第一个参数：表示命令名(必须是绝对路径)
+	第二个参数：表示命令接受参数集合
+	第三个参数：表示环境变量集合
+
+
+练习： 实现兄弟进程之间读和写
+练习：实现cat /etc/passwd | grep root 命令
+	
+	管道
+	进程
+	exec
+	dup2
+
+=====================================
+有名管道：就是通过管道文件进行通讯
+	1 创建有名管道文件
+		int mkfifo(const char *pathname, mode_t mode);
+		返回值：
+			成功：0
+			失败：-1
+
+		如果文件存在，则创建失败
+	2 判断文件是否存在
+		int access(const char *pathname, int mode);
+		第二个参数：
+			R_OK 如果文件存在，判断是否读权限
+			W_OK 写的权限
+			X_OK 可执行的权限
+			F_OK 判断文件是否存在
+
+	3 打开文件
+		open
+
+	4 读或者写
+		read or write
+	5 关闭文件
+		close
+
+
+
+homework 
+
+1封装定时器   链表
+
+	1 => 11111
+	2 => 22222
+	5 => 55555
+	7 => 77777
+	9 => 99999
+	12 => 121212 
+	..........  => 机器时间
+
+	封装定时器struct timer_t{
+		int time;
+		int count_time;//用于累加定时器时间
+		void *data;
+		void (*print_func)(void *);
+		/*
+		int flag;//0 循环  1 不循环
+		int loop_count;
+		struct tm current_time
+		struct tm timer_time
+		*/
+		/*
+		struct timer_t *next;
+		struct timer_t *prev;
+		*/
+	}
+
+2:tell
+	实现一对一聊天
+
+
+
+
+
+
+
+
+
+
+
+
