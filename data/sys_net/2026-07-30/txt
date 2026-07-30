@@ -1,0 +1,258 @@
+
+
+
+windows : 192.168.2.120
+
+
+vfork 和 fork的区别
+
+signal => 函数指针
+	typedef void (*sighandler_t)(int);
+
+alarm => 秒
+
+timer => 微妙
+
+1秒 = 1000000微妙  => 阻塞
+定时器类型有三种
+	机器时间 => 睡眠或者轮寻方式执行
+	用户态时间
+	用户态+系统态   => 只能轮寻的方式执行
+
+管道
+	匿名管道：
+		只能实现父子进程或者兄弟进程
+	有名管道：
+		实现任意进程之间通讯
+数据通讯方式三种
+	单工：
+	半双工：管道
+	全双工：
+执行外部进程exec函数
+	执行外部进程会替换掉当前进程的镜像，唯一保留下来的只有进程号。
+
+====================================
+消息队列：
+	1 创建消息队列
+		int msgget(key_t key, int msgflg);
+		第一个参数：表示消息队列关键字
+			key_t => int
+
+		第二个参数：表示标志位
+			IPC_CREAT ： 表示创建
+		返回值：
+			成功：消息对列描述符
+			失败：-1
+
+
+查看消息队列
+[root@www 03_msg]# ipcs -q
+
+------ Message Queues --------
+key        msqid      owner      perms      used-bytes   messages    
+0x0000007b 0          root       0          0            0           
+
+删除消息对列
+	ipcrm -q msgid
+	or
+	ipcrm -Q key
+
+
+获取消息对列关键字
+	key_t ftok(const char *pathname, int proj_id);
+	第一个参数：表示文件名
+		=> inode
+	第二个参数：表示用户输入序列号
+
+	一般规律： 32bit
+		首先取出用户输入序列号的低8位作为key值的高8位
+		再次取出文件inode节点号的低16位作为key值的低16位
+		最后 => 0x02
+
+发送数据
+	int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+		第一个参数：表示消息对列描述符 msgget返回值
+		第二个参数：表示发送数据空间地址
+		第三个参数：表示发送数据大小
+		第三个参数：表示标志位
+			IPC_NOWAIT ： 表示不阻塞
+		返回值：
+			失败：-1
+			成功：0
+接受数据
+	ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp,
+							 int msgflg);
+		第一个参数：表示消息队列的描述符  msgget返回值
+		第二个参数：表示存储数据空间地址
+		第三个参数：表示空间大小
+		第四个参数：表示数据类型
+			0 ： 表示不关心数据类型
+			获取数据则是队列操作方式
+		第五个参数：表示标志位 0
+			默认是阻塞的方式接受数据
+
+		返回值：
+			失败：-1
+			成功：表示读取数据字节数
+
+练习：
+	struct cls_t{
+		char name[64];
+		char sex;
+		int id;
+	};
+
+	struct tea_t{
+		char name[16];
+		int age
+	};
+
+=========================================
+消息队列控制函数
+	int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+	第一个参数：表示消息对列描述符
+	第二个参数：表示指令
+		IPC_STAT ： 表示获取消息队列属性
+		IPC_SET	 ：	表示修改消息队列的属性
+		IPC_RMID ： 表示删除消息队列
+
+	第三个参数：对命令补充
+
+
+==========================================
+共享内存：kernel
+	1 获取共享内存的关键字
+		ftok()
+
+	2 创建共享内存
+		int shmget(key_t key, size_t size, int shmflg);
+		第一个参数：表示key => ftok
+		第二个参数：表示指定共享内存大小
+		第三个参数：表示标志位
+		返回值：
+			失败：-1
+			成功：共享内存id
+			
+	3 映射 把共享内存映射到进程中
+		void *shmat(int shmid, const void *shmaddr, int shmflg);
+		第一个参数：表示共享内存id
+		第二个参数：表示映射空间地址 
+			NULL ： 表示由程序指定可操作一片空间地址
+		第三个参数：表示标志位
+			0 ： 表示可读可写
+			SHM_RDONLY ： 表示只读
+		返回值：
+			成功：表示映射到进程中空间地址
+			失败：NULL
+	4 处理数据
+
+	5 解映射
+		int shmdt(const void *shmaddr);
+		返回值：
+			失败：-1
+			成功：0
+	6 销毁
+		int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+
+
+查看共享内存：
+	ipcs -m
+删除：
+	ipcrm -m shmid
+	ipcrm -M key
+
+
+练习：
+	学生结构为例
+
+===============================================
+memcpy
+memmove
+void *memcpy(void *dest, const void *src, size_t n);
+void *memmove(void *dest, const void *src, size_t n);
+
+
+======================================================
+信号量
+	也叫信号量锁
+	是利用进程资源，达到锁的一种状态，并不会进程进程之间的通讯。
+
+IPC通讯：
+	消息队列  共享内存  信号量
+
+
+1 获取创建信号量锁的key
+	ftok
+2 创建信号量锁
+	int semget(key_t key, int nsems, int semflg);
+	第一个参数：表示关键字
+	第二个参数：表示创建锁的个数
+	第三个参数：表示IPC_CREAT
+	返回值：
+		失败：-1
+
+3 初始化锁变量
+	int semctl(int semid, int semnum, int cmd, ...);
+	第一个参数：表示信号量锁的描述符
+	第二个参数：表示锁的索引号
+		锁的索引号默认是从0开始
+		第一把锁索引号就是0
+		第二把锁索引号就是1
+		.......
+
+	第三个参数：指令
+		IPC_STAT： 查看锁的属性
+		IPC_SET	： 设置锁属性
+		IPC_RMID ： 表示销毁信号量锁
+		SETVAL	： 表示设置当前锁
+	...  : 可变参 对命令的补充
+
+	返回值：
+		失败：-1
+		成功：0
+
+4 设置加锁和解锁
+	正数：表示锁打开
+	负数：表示锁关闭
+
+	int semop(int semid, struct sembuf *sops, unsigned nsops);
+	第一个参数：表示锁描述符
+	第二个参数：表示锁状态结构体
+		unsigned short sem_num;  /* semaphore number */
+			锁的索引号
+		short          sem_op;   /* semaphore operation */
+			正数：打开
+			负数：关闭
+		short          sem_flg;  /* operation flags */
+			标志位 0 
+	第三个参数：表示锁的个数
+	返回值：
+		
+
+查看：
+	ipcs -s
+删除：
+	ipcrm -s id
+	ipcrm -S key
+
+
+			
+
+homework:
+	1 消息队列实现文件的发送和接受
+	2 实现信号量锁 => 文件作为主文件  锁实现作为子文件
+			 => 锁的实现作为主文件  文件操作作为子文件
+
+
+
+
+
+
+
+
+
+
+
+
+
+

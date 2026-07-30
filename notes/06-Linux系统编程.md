@@ -8,6 +8,7 @@
 
 | 日期 | 章节 | 更新内容 |
 |------|------|----------|
+| 2026-07-30 | 第27-31章 | 作业回顾（定时器链表封装、tell一对一聊天）、消息队列（msgget/ftok/msgsnd/msgrcv/msgctl+结构体类型化消息）、共享内存（shmget/shmat/shmdt/shmctl+独立进程读写）、多进程写文件竞争、信号量（semget/semctl/semop+lock/unlock封装+多进程加锁写文件）、IPC资源管理（ipcs/ipcrm）、课后作业 |
 | 2026-07-29 | 第21-26章 | 作业回顾（守护进程）、vfork与fork对比、信号（kill/signal/SIG_DFL/SIG_IGN/SIG_ERR、alarm闹钟、setitimer定时器）、exec族函数（6个函数+system+environ）、匿名管道pipe（父子/兄弟进程通讯、SIGPIPE、管道容量64K）、有名管道fifo（mkfifo+access）、课后作业 |
 | 2026-07-28 | 第15-20章 | 作业回顾（tree实现、加密解密）、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |
 | 2026-07-27 | 第7-14章 | sys IO综合（cp实现、文件类型位运算查表）、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |、用户与组信息（getpwuid/getgrnam/getspnam）、口令加密（crypt）、时间函数（time/ctime/localtime/strftime）、文件系统操作（readlink/mkdir/chmod/chown/link/symlink/chdir/getcwd）、目录操作（opendir/readdir/closedir）、进程基础（fork/getpid/getppid、内存独享性验证）、课后作业 |
@@ -2213,6 +2214,532 @@ unlink(argv[1]);
 
 ---
 
+## 第27章 作业回顾
+
+### 27.1 定时器链表封装
+
+利用 `setitimer` + 链表实现多个定时任务管理。
+
+**数据结构**：
+
+```c
+// 01_timer.c — 定时器节点
+typedef void (PRI)(void *);
+
+struct timer_t {
+    int time;             // 定时器定时间隔
+    int count_time;       // 累加计数器
+    PRI *print;           // 回调函数指针
+    void *data;           // 回调参数
+    int flag;             // 0=循环, 1=一次性
+
+    struct timer_t *next;
+    struct timer_t *prev;
+};
+
+// 双向循环链表头
+struct timer_t head = {.next = &head, .prev = &head};
+```
+
+**核心逻辑**：
+
+```c
+// 添加定时器（尾插）
+void add_timer(int time, PRI *func, void *data, int flag) {
+    struct timer_t *new = malloc(sizeof(struct timer_t));
+    new->time = time;  new->count_time = 0;
+    new->print = func; new->data = data;  new->flag = flag;
+    // 尾插入双向循环链表
+    new->next = &head;  new->prev = head.prev;
+    head.prev->next = new;  head.prev = new;
+}
+
+// 信号回调：遍历链表，count_time++，等于 time 时触发
+void travel(int sig) {
+    struct timer_t *tail, *save;
+    for (tail = head.next; tail != &head; tail = save) {
+        save = tail->next;
+        tail->count_time++;
+        if (tail->count_time == tail->time) {
+            tail->print(tail->data);
+            tail->count_time = 0;
+            if (tail->flag) {           // 一次性 → 删除节点
+                tail->next->prev = tail->prev;
+                tail->prev->next = tail->next;
+                free(tail);
+            }
+        }
+    }
+}
+
+// 初始化：signal + setitimer
+void init_timer(int t) {
+    signal(SIGALRM, travel);
+    struct itimerval it;
+    it.it_value.tv_sec = 2;
+    it.it_interval.tv_sec = t;       // 每秒检查一次
+    setitimer(ITIMER_REAL, &it, NULL);
+}
+```
+
+### 27.2 tell — 一对一聊天
+
+利用**两个 FIFO** 实现全双工通讯（zhangsan ↔ lisi）：
+
+| 管道 | 方向 |
+|------|------|
+| `./ztol` | zhangsan → lisi |
+| `./ltoz` | lisi → zhangsan |
+
+每个程序用 `fork` 分出读子进程和写父进程，用 VT 码控制光标位置：
+
+```c
+// 02_tell/zhangsan.c 核心结构
+fdw = open("./ztol", O_RDWR);    // zhangsan 写端
+fdr = open("./ltoz", O_RDWR);    // zhangsan 读端
+
+if (fork() == 0) {
+    // 子进程：收 lisi 消息
+    while (1) {
+        read(fdr, buf, sizeof(buf));
+        printf("\033[%d;10Hlisi : \033[K%s\033[u", OUTPUT, buf);
+    }
+}
+// 父进程：发消息
+while (1) {
+    printf("\033[%d;10Hzhangsan : \033[K\033[s", INPUT);
+    fgets(buf, sizeof(buf), stdin);
+    write(fdw, buf, strlen(buf) + 1);
+    if (!strcmp(buf, "goodbye")) break;
+}
+```
+
+---
+
+## 第28章 消息队列（Message Queue）
+
+### 28.1 IPC 资源管理
+
+```bash
+ipcs -q           # 查看消息队列
+ipcs -m           # 查看共享内存
+ipcs -s           # 查看信号量
+
+ipcrm -q msgid    # 删除消息队列（或 ipcrm -Q key）
+ipcrm -m shmid    # 删除共享内存（或 ipcrm -M key）
+ipcrm -s semid    # 删除信号量（或 ipcrm -S key）
+```
+
+### 28.2 ftok — 生成 IPC key
+
+```c
+#include <sys/ipc.h>
+
+key_t ftok(const char *pathname, int proj_id);
+```
+
+**返回值**：成功返回 key，失败 `-1`。
+
+**key 生成规则（32bit）**：
+
+```
+key = (proj_id 低8位) << 24 | 0x02 << 16 | (inode 低16位)
+```
+
+```c
+// 03_msg/02_ftok.c — 验证 key 生成
+key = ftok(argv[1], 123);
+
+stat(argv[1], &s);
+num = (123 << 24) | (0x2 << 16) | (s.st_ino & 0xffff);
+// num == key
+```
+
+### 28.3 msgget — 创建/获取消息队列
+
+```c
+#include <sys/msg.h>
+
+int msgget(key_t key, int msgflg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `key` | `ftok()` 返回值或 `IPC_PRIVATE` |
+| `msgflg` | `IPC_CREAT`（不存在则创建）或 `IPC_CREAT \| IPC_EXCL`（存在则报错） |
+
+**返回值**：成功返回消息队列 ID，失败 `-1`。
+
+```c
+// 03_msg/01_creat.c
+int msgid = msgget(123, IPC_CREAT);       // 直接用数字 key
+int msgid = msgget(ftok(".", 123), IPC_CREAT);  // 用 ftok
+```
+
+### 28.4 msgsnd — 发送消息
+
+```c
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `msqid` | 消息队列 ID |
+| `msgp` | 发送数据地址 |
+| `msgsz` | 数据大小（字节） |
+| `msgflg` | `0` 阻塞，`IPC_NOWAIT` 非阻塞 |
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 03_msg/03_send.c
+char buf[128];
+GETLINES("input send string : ", buf);
+msgsnd(msgid, buf, strlen(buf) + 1, 0);
+```
+
+### 28.5 msgrcv — 接收消息
+
+```c
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `msgtyp` | `0` 不关心类型（队列方式），`> 0` 指定类型 |
+| `msgflg` | `0` 阻塞等待 |
+
+**返回值**：成功返回实际读取字节数，失败 `-1`。
+
+```c
+// 03_msg/04_recv.c
+char buf[128];
+msgrcv(msgid, buf, sizeof(buf), 0, 0);    // 不区分类型
+printf("buf : %s\n", buf);
+```
+
+### 28.6 msgctl — 消息队列控制
+
+```c
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+```
+
+| cmd | 作用 |
+|-----|------|
+| `IPC_STAT` | 获取消息队列属性 |
+| `IPC_SET` | 修改消息队列属性 |
+| `IPC_RMID` | **删除消息队列** |
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 03_msg/05_msgctl.c
+msgctl(msgid, IPC_RMID, 0);    // 删除消息队列
+```
+
+### 28.7 结构体类型化消息
+
+消息可以带类型（`long type`），接收时按类型筛选：
+
+```c
+// 03_msg/struct/data.h
+struct cls_t {
+    long type;               // 必须！消息类型（> 0）
+    char name[64];
+    char sex;
+    int id;
+};
+
+struct tea_t {
+    long type;               // 必须！消息类型
+    int age;
+    char name[64];
+};
+```
+
+```c
+// send.c — 发送（type 区分学生/老师）
+struct cls_t cls = {1, "tom", 'M', 10086};
+struct tea_t tea = {2, 40, "laozhang"};
+
+msgsnd(msgid, &cls, sizeof(cls), 0);
+msgsnd(msgid, &tea, sizeof(tea), 0);
+```
+
+```c
+// recv.c — 按类型接收
+if (atoi(argv[1]) == 1)
+    msgrcv(msgid, &cls, sizeof(cls), 1, 0);    // 只要学生
+else
+    msgrcv(msgid, &tea, sizeof(tea), 2, 0);    // 只要老师
+```
+
+> 消息结构体第一个成员必须是 `long type`，且值必须 > 0。
+
+---
+
+## 第29章 共享内存（Shared Memory）
+
+### 29.1 操作流程
+
+```
+ftok → shmget(创建) → shmat(映射到进程) → 读写 → shmdt(解映射) → shmctl(IPC_RMID 销毁)
+```
+
+### 29.2 shmget — 创建共享内存
+
+```c
+#include <sys/shm.h>
+
+int shmget(key_t key, size_t size, int shmflg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `key` | `ftok()` 返回值 |
+| `size` | 共享内存大小（字节），内核按 PAGE_SIZE 向上取整 |
+| `shmflg` | `IPC_CREAT`，可 `|` 权限（如 `0666`） |
+
+**返回值**：成功返回共享内存 ID，失败 `-1`。
+
+```c
+// 04_shm/01_creat.c
+key_t key = ftok(".", 0x55);
+int shmid = shmget(key, 1024, IPC_CREAT);
+```
+
+### 29.3 shmat — 映射到进程
+
+```c
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `shmaddr` | 指定映射地址，`NULL` 由系统选择 |
+| `shmflg` | `0` 可读可写，`SHM_RDONLY` 只读 |
+
+**返回值**：成功返回进程中的映射地址，失败 `(void *)-1`。
+
+```c
+// 04_shm/02_shmat.c
+char *mem = shmat(shmid, NULL, 0);    // 返回可读可写地址
+```
+
+### 29.4 读写数据
+
+共享内存映射后，像普通内存一样直接读写：
+
+```c
+// 04_shm/03_data.c — 写入 + 读出
+strcpy(mem, "hello");                  // 写入共享内存
+printf("mem : %s\n", mem);             // 读取
+```
+
+### 29.5 shmdt — 解映射
+
+```c
+int shmdt(const void *shmaddr);
+```
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 04_shm/04_shmdt.c
+shmdt(mem);    // 解映射后不能再访问 mem
+```
+
+### 29.6 shmctl — 共享内存控制/销毁
+
+```c
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+```
+
+| cmd | 作用 |
+|-----|------|
+| `IPC_STAT` | 获取共享内存属性 |
+| `IPC_SET` | 修改共享内存属性 |
+| `IPC_RMID` | **删除共享内存** |
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 04_shm/05_shmctl.c
+shmctl(shmid, IPC_RMID, 0);
+```
+
+### 29.7 独立进程共享内存通讯
+
+两个进程通过同样的 `ftok` + `shmget` 获取同一个共享内存：
+
+```c
+// 04_shm/string/write.c — 写进程
+shmid = shmget(ftok(".", 0x55), 1024, IPC_CREAT);
+mem = shmat(shmid, NULL, 0);
+strcpy(mem, buf);                     // 写入
+
+// 04_shm/string/read.c — 读进程
+shmid = shmget(ftok(".", 0x55), 1024, IPC_CREAT);
+mem = shmat(shmid, NULL, 0);
+printf("buf : %s\n", mem);            // 读出
+```
+
+> 共享内存不提供同步机制，需要配合**信号量**实现互斥。
+
+---
+
+## 第30章 多进程文件竞争
+
+### 30.1 问题演示
+
+10 个进程同时向同一文件写入 → 数据**交叉覆盖**，文件内容错乱：
+
+```c
+// 05_mul_file.c — 10 个进程同时写文件（无锁）
+void do_work(int fd) {
+    char buf[128] = "hello world\n";
+    for (int line = LINE; line > 0; line--) {
+        for (int i = 0; i < strlen(buf); i++)
+            write(fd, &buf[i], 1);     // 逐字符写 → 易被打断!
+    }
+}
+
+for (i = 0; i < MAX; i++) {
+    if (fork() == 0) { do_work(fd); exit(0); }
+}
+```
+
+---
+
+## 第31章 信号量（Semaphore）
+
+信号量是**进程间的锁**，用于保护共享资源的互斥访问，本身不传输数据。
+
+### 31.1 semget — 创建信号量
+
+```c
+#include <sys/sem.h>
+
+int semget(key_t key, int nsems, int semflg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `key` | `ftok()` 返回值 |
+| `nsems` | 信号量个数（通常 1 把锁） |
+| `semflg` | `IPC_CREAT` |
+
+**返回值**：成功返回信号量 ID，失败 `-1`。
+
+```c
+// 06_sem/01_creat.c
+key_t key = ftok(".", 0x66);
+int semid = semget(key, 1, IPC_CREAT);    // 创建 1 把锁
+```
+
+### 31.2 semctl — 初始化/控制
+
+```c
+int semctl(int semid, int semnum, int cmd, ...);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `semid` | 信号量 ID |
+| `semnum` | 锁索引号（从 0 开始） |
+| `cmd` | `SETVAL` 设值，`IPC_RMID` 删除 |
+
+**返回值**：成功 `0`，失败 `-1`。
+
+```c
+// 06_sem/02_init.c — 初始化锁为打开状态
+int val = 1;                                      // 正数 = 打开
+semctl(semid, 0, SETVAL, val);                    // 初始化第 0 号锁
+```
+
+### 31.3 semop — 加锁/解锁
+
+```c
+int semop(int semid, struct sembuf *sops, unsigned nsops);
+```
+
+```c
+struct sembuf {
+    unsigned short sem_num;    // 锁索引号
+    short          sem_op;     // 负数=加锁(P操作), 正数=解锁(V操作)
+    short          sem_flg;    // 0 阻塞，IPC_NOWAIT 非阻塞
+};
+```
+
+**返回值**：成功 `0`，失败 `-1`。
+
+### 31.4 lock/unlock 封装
+
+```c
+// 06_sem/03_sem_lock_unlock.c — 封装加锁/解锁
+int lock(int semid, int num) {
+    struct sembuf op;
+    op.sem_num = num;
+    op.sem_op = -1;            // P 操作：信号量 -1（如已是 0 则阻塞等待）
+    op.sem_flg = 0;
+    return semop(semid, &op, 1);
+}
+
+int unlock(int semid, int num) {
+    struct sembuf op;
+    op.sem_num = num;
+    op.sem_op = 1;             // V 操作：信号量 +1（唤醒等待者）
+    op.sem_flg = 0;
+    return semop(semid, &op, 1);
+}
+```
+
+### 31.5 多进程加锁写文件
+
+```c
+// 06_sem/04_mul_file.c — 信号量保护多进程写文件
+void do_work(int fd, int semid) {
+    lock(semid, 0);                      // 加锁（其他进程阻塞等待）
+    // ... 写文件（临界区）...
+    unlock(semid, 0);                    // 解锁
+}
+
+// main:
+int semid = init_sem();                  // 创建 + 初始化
+
+for (i = 0; i < MAX; i++) {
+    if (fork() == 0) {
+        do_work(fd, semid);
+        exit(0);
+    }
+}
+```
+
+> **注意**：不可重复加锁（已持有锁的进程再次 lock 会死锁）。
+
+### 31.6 独立模块化
+
+```c
+// 06_sem/05_sem.c — 信号量初始化封装为独立函数
+int init_sem(void) {
+    key_t key = ftok(".", 0x66);
+    int semid = semget(key, 1, IPC_CREAT);
+    semctl(semid, 0, SETVAL, 1);         // 初始化为打开
+    return semid;
+}
+```
+
+---
+
+## 第32章 课后作业
+
+| 序号 | 作业 | 要点 |
+|------|------|------|
+| 1 | 消息队列实现文件发送和接收 | 读取文件内容 → msgsnd 分段发送 → msgrcv 接收 → 写入新文件 |
+| 2 | 信号量锁模块化 | 锁实现作为独立子文件（`.c/.h`），文件操作作为主文件调用 lock/unlock |
+
+---
+
 ## 本章小结
 
 ```
@@ -2228,10 +2755,12 @@ stat/文件属性     ███████████████████�
 进程等待/wait     ████████████████████
 孤儿/僵尸/守护    ████████████████████
 进程组/资源限制   ████████████████████
-vfork             ████████████████████
 信号/signal       ████████████████████
 定时器/alarm      ████████████████████
 exec 族函数       ████████████████████
 匿名管道 pipe     ████████████████████
 有名管道 fifo     ████████████████████
+消息队列 msg      ████████████████████
+共享内存 shm      ████████████████████
+信号量 sem        ████████████████████
 ```

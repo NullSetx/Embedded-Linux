@@ -1,6 +1,6 @@
 # 嵌入式与Linux开发学习笔记
 
-> 最后更新：2026-07-29
+> 最后更新：2026-07-30
 
 ## 目录
 
@@ -51,9 +51,9 @@
 
 | 序号 | 主题 | 文件 | 章节数 | 状态 |
 |------|------|------|--------|------|
-| 06 | Linux系统编程 | [06-Linux系统编程.md](notes/06-Linux系统编程.md) | 26章 | 📝 |
+| 06 | Linux系统编程 | [06-Linux系统编程.md](notes/06-Linux系统编程.md) | 32章 | 📝 |
 
-涵盖：kernel五大子系统、虚拟内存布局、sys IO（open/close/read/write/lseek/dup/fcntl）、文件权限与umask/特殊权限位（SUID/SGID/Sticky）、stat/lstat文件属性与类型检测、用户与组信息（getpwuid/getgrnam/getspnam/crypt）、时间函数、文件系统操作（readlink/mkdir/chmod/chown/chdir）、目录操作（opendir/readdir/tree）、进程基础（fork/vfork/getpid/getppid、内存独享性）、进程退出（return/exit/_exit/atexit/abort/kill）、进程等待（wait/waitpid/WIFEXITED）、孤儿/僵尸/守护进程、进程组/会话/资源限制、信号（kill/signal/alarm/setitimer）、exec族函数、匿名管道pipe、有名管道fifo
+涵盖：kernel五大子系统、sys IO（open/close/read/write/lseek/dup/fcntl）、文件权限与特殊权限位（SUID/SGID/Sticky）、stat文件属性与类型检测、用户与组信息（getpwuid/crypt）、时间函数、文件系统与目录操作（readlink/chmod/chdir/opendir/tree）、进程（fork/vfork/exit/wait/孤儿/僵尸/守护/进程组/资源限制）、信号（kill/signal/alarm/setitimer+定时器链表）、exec族函数、匿名管道pipe、有名管道fifo（tell聊天）、IPC（消息队列/共享内存/信号量）
 
 ### 第六阶段：嵌入式开发
 *（待学习）*
@@ -67,7 +67,7 @@ Linux基础           ███████████████████�
 Vim编辑器           ████████████████████ 100%
 C语言基础           ████████████████████ 100%
 数据结构            ████████████████████ 100%
-Linux系统编程       ██████████░░░░░░░░░░░░  44%
+Linux系统编程       ███████████░░░░░░░░░░░  56%
 
 ```
 

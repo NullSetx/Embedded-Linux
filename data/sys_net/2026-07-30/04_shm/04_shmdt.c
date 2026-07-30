@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <stdlib.h>
+#include <share.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <grp.h>
+#include <shadow.h>
+#include <time.h>
+#include <dirent.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <signal.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/shm.h>
+
+int main(int argc, char *argv[])
+{
+	key_t key;
+	int shmid;
+	char *mem = NULL;
+	char buf[128] = {};
+
+	//1 关键字
+	key = ftok(".", 0x55);
+	ERRP(-1 == key, ftok, goto ERR1);
+
+	PRI_H(key);
+
+	//2 创建
+	shmid = shmget(key, 1024, IPC_CREAT);
+	ERRP(-1 == shmid, shmget, goto ERR1);
+
+	PRI_D(shmid);
+	
+	//3 映射
+	mem = shmat(shmid, NULL, 0);
+
+	PRI_P(mem);
+
+	//4 写数据
+	strcpy(mem, "hello");
+
+	//5 读数据
+	/*printf("mem : %s\n", mem);*/
+	strcpy(buf, mem);
+	printf("buf : %s\n", buf);
+
+
+	//6 解映射
+	ERRP(shmdt(mem) == -1, shmdt, goto ERR1);
+
+	printf("shmdt success!\n");
+
+	printf("mem : %s\n", mem);
+	
+	return 0;
+ERR1:
+	return -1;
+}
