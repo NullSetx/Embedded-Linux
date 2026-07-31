@@ -8,6 +8,7 @@
 
 | 日期 | 章节 | 更新内容 |
 |------|------|----------|
+| 2026-07-31 | 第33-38章 | 消息队列传文件（作业回顾）、线程基础（pthread_self/pthread_create/线程vs进程对比）、线程数据共享与参数传递（全局/堆/栈、int\*/struct\*/二级指针）、线程退出与等待（pthread_exit/pthread_join/返回值模式）、互斥锁（静态/动态初始化、lock/unlock/trylock/destroy、多线程写文件）、线程清理函数（pthread_cleanup_push/pop、二级指针释放） |
 | 2026-07-30 | 第27-31章 | 作业回顾（定时器链表封装、tell一对一聊天）、消息队列（msgget/ftok/msgsnd/msgrcv/msgctl+结构体类型化消息）、共享内存（shmget/shmat/shmdt/shmctl+独立进程读写）、多进程写文件竞争、信号量（semget/semctl/semop+lock/unlock封装+多进程加锁写文件）、IPC资源管理（ipcs/ipcrm）、课后作业 |
 | 2026-07-29 | 第21-26章 | 作业回顾（守护进程）、vfork与fork对比、信号（kill/signal/SIG_DFL/SIG_IGN/SIG_ERR、alarm闹钟、setitimer定时器）、exec族函数（6个函数+system+environ）、匿名管道pipe（父子/兄弟进程通讯、SIGPIPE、管道容量64K）、有名管道fifo（mkfifo+access）、课后作业 |
 | 2026-07-28 | 第15-20章 | 作业回顾（tree实现、加密解密）、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |、用户管理命令与特殊权限位（SUID/SGID/Sticky）、fork与heap独享性、进程退出8种方式（return/exit/_exit/atexit/abort）、进程等待（wait/waitpid/WIFEXITED/WEXITSTATUS）、孤儿进程/僵尸进程/守护进程、进程组与会话（getpgid/setsid）、资源限制（getrlimit/setrlimit）、课后作业 |
@@ -2740,6 +2741,522 @@ int init_sem(void) {
 
 ---
 
+---
+## 第33章 消息队列传文件（作业回顾）
+
+### 33.1 设计思路
+
+用消息队列实现文件传输：发送端逐字节读取文件 → `msgsnd` 发送 → 接收端 `msgrcv` 逐字节接收 → 输出。
+
+```
+发送端(send.c)          消息队列          接收端(recv.c)
+   |                      |                    |
+   |-- read(fd, &ch, 1) ->|                    |
+   |-- msgsnd(msgid, &ch, 1, 0) -->|           |
+   |                       |-- msgrcv(msgid, &ch, 1, 0, IPC_NOWAIT) -->|
+   |                       |                    |-- putchar(ch)
+```
+
+### 33.2 公共头文件 data.h
+
+```c
+#ifndef __DATA_H__
+#define __DATA_H__
+
+struct cls_t {
+    long type;
+    char name[64];
+    char sex;
+    int id;
+};
+
+struct tea_t {
+    long type;
+    int age;
+    char name[64];
+};
+
+#endif
+```
+
+### 33.3 发送端 send.c
+
+```c
+// 01_file/send.c
+key = ftok(".", 123);
+msgid = msgget(key, IPC_CREAT);
+
+fd = open(argv[1], O_RDONLY);
+
+while (1) {
+    ret = read(fd, &ch, 1);
+    if (ret == 0) break;              // 文件读完
+
+    ret = msgsnd(msgid, &ch, 1, 0);   // 逐字节发送
+    if (ret == -1) break;
+}
+```
+
+### 33.4 接收端 recv.c
+
+```c
+// 01_file/recv.c
+key = ftok(".", 123);
+msgid = msgget(key, IPC_CREAT);
+
+while (1) {
+    ret = msgrcv(msgid, &ch, 1, 0, IPC_NOWAIT);  // 非阻塞接收
+    if (ret != 1) break;
+
+    putchar(ch);
+    fflush(NULL);                     // 立即刷新输出
+}
+```
+
+> 接收端使用 `IPC_NOWAIT` 非阻塞模式，消息队列为空时返回 `-1` 退出循环。
+
+### 33.5 Makefile
+
+```makefile
+all:
+    gcc send.c -o send
+    gcc recv.c -o recv
+clean:
+    rm send recv -rf
+```
+
+---
+
+## 第34章 线程基础
+
+### 34.1 什么是线程
+
+线程是一段可执行代码在内存中运行，识别线程的唯一标识是**线程号**。
+
+```
+进程 = 资源管理的最小单位
+线程 = 执行流的最小单位
+
+一个程序 ≥ 一个进程 ≥ 一个线程
+```
+
+### 34.2 进程与线程对比
+
+| 维度 | 进程 | 线程 |
+|------|------|------|
+| **执行效率** | 低（切换有时间开销） | 高（切换几乎无开销） |
+| **数据安全** | 高（一个进程异常不影响其他） | 低（一个线程异常，整个进程崩溃） |
+| **资源** | 独立地址空间 | 共享进程地址空间 |
+| **创建/销毁** | 开销大 | 开销小 |
+
+**结论**：追求效率用线程，追求安全用进程。
+
+### 34.3 线程特性
+
+| 特性 | 说明 |
+|------|------|
+| **动态性** | 线程生命周期：创建 → 就绪 → 运行 → 阻塞 → 终止 |
+| **共享性** | 同一进程的线程共享内存和资源 |
+| **并发性** | 多个线程可以同时运行（时间片轮转） |
+| **异步性** | 线程以不可预知的速度向前推进 |
+
+### 34.4 pthread_self — 获取线程号
+
+```c
+#include <pthread.h>
+
+pthread_t pthread_self(void);
+typedef unsigned long int pthread_t;    // %lu 打印
+```
+
+**返回值**：当前线程的线程号。
+
+```c
+// 02_pthread.c
+printf("pthid : %lu\n", pthread_self());    // 线程号
+printf("pid  : %d\n", getpid());            // 进程号（同进程内相同）
+```
+
+> 编译链接时需加 `-pthread`。
+
+### 34.5 pthread_create — 创建线程
+
+```c
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                   void *(*start_routine)(void *), void *arg);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `thread` | 输出：保存新创建线程的线程号 |
+| `attr` | 线程属性，`NULL` 表示默认属性 |
+| `start_routine` | 线程执行函数，**返回类型必须是 `void *`，参数必须是 `void *`** |
+| `arg` | 传递给线程执行函数的参数 |
+
+**返回值**：成功 `0`，失败返回错误号（非零）。
+
+```c
+// 03_creat.c
+void *hello(void *data) {
+    printf("pthid : %lu  pid : %d\n", pthread_self(), getpid());
+    return NULL;
+}
+
+int main(void) {
+    pthread_t pthid;
+    pthread_create(&pthid, NULL, hello, NULL);
+    pthread_join(pthid, NULL);    // 等待线程结束
+    return 0;
+}
+```
+
+---
+
+## 第35章 线程数据共享与参数传递
+
+### 35.1 数据共享规则
+
+| 内存区域 | 是否共享 | 说明 |
+|----------|----------|------|
+| **全局变量（DS 段）** | ✅ 共享 | 所有线程访问同一变量 |
+| **堆（malloc）** | ✅ 共享 | 只要有指针就能访问 |
+| **栈（局部变量）** | ❌ 独享 | 每个线程有独立栈空间 |
+
+```c
+// 04_val.c — 验证共享性
+int global = 100;                        // DS 段：所有线程共享
+
+void *hello(void *data) {
+    int *heap = malloc(sizeof(int));     // 堆：每个线程有自己的堆变量
+    *heap = 200;
+
+    printf("global : %d\n", global);     // 共享，都是 100
+    printf("heap   : %d\n", *heap);      // 各自独立的堆数据
+    // 局部变量在栈上，各自独立
+}
+```
+
+### 35.2 参数传递 — int 指针
+
+```c
+// 05_arg.c — 通过 int* 传参，线程修改后主线程可见
+void *hello(void *data) {
+    int *p = (int *)data;
+    *p = 100;                            // 修改指向的值
+    return NULL;
+}
+
+int main(void) {
+    int a = 10;
+    pthread_t pthid;
+    pthread_create(&pthid, NULL, hello, &a);
+    pthread_join(pthid, NULL);
+    printf("a : %d\n", a);               // 输出 100（被线程修改）
+}
+```
+
+### 35.3 参数传递 — 结构体指针
+
+```c
+// 06_struct.c — 必须传结构体地址，不能强转值
+struct cls_t cls;
+cls.a = 10;
+
+// 正确：
+pthread_create(&pthid, NULL, hello, &cls);      // 传地址
+
+// 错误（编译警告）：
+pthread_create(&pthid, NULL, hello, (void *)cls.a);  // 不能将值当指针
+```
+
+> `void *` 是 8 字节指针，不能将 4 字节 int 或结构体值强转为指针传递。必须传地址。
+
+### 35.4 参数传递 — 二级指针（线程内 malloc）
+
+```c
+// 08_malloc.c — 线程分配内存，主线程使用
+void *hello(void *data) {
+    struct cls_t **cls = (struct cls_t **)data;
+    *cls = malloc(sizeof(struct cls_t));  // 线程内 malloc
+    (*cls)->id = 10086;
+    return NULL;
+}
+
+int main(void) {
+    struct cls_t *cls = NULL;
+    pthread_t pthid;
+
+    pthread_create(&pthid, NULL, hello, &cls);  // 传二级指针
+    pthread_join(pthid, NULL);
+
+    printf("id : %d\n", cls->id);         // 主线程访问线程 malloc 的内存
+    free(cls);
+}
+```
+
+> 通过二级指针，线程可以给主线程"返回"一个 malloc 出来的内存。
+
+### 35.5 多线程异常演示
+
+```c
+// 09_mul_pthread.c — 10 个线程，第 5 个 abort
+for (i = 0; i < 10; i++)
+    pthread_create(&pthid[i], NULL, hello, NULL);
+
+// hello 中：第 5 个线程调用 abort() → 整个进程终止
+```
+
+```c
+// 10_mul_process.c — 10 个进程，第 5 个 abort
+for (i = 0; i < 10; i++) {
+    if (fork() == 0) {
+        if (i == 5) abort();             // 只有第 5 个进程终止
+    }
+}
+```
+
+> 对比验证：线程不安全（一个 abort 全部死），进程安全（一个 abort 不影响其他）。
+
+---
+
+## 第36章 线程退出与等待
+
+### 36.1 pthread_exit — 线程退出
+
+```c
+void pthread_exit(void *retval);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `retval` | 线程执行函数的返回值，可被 `pthread_join` 获取 |
+
+```c
+// 11_exit_join.c
+void *hello(void *data) {
+    printf("thread running ...\n");
+    pthread_exit(NULL);          // 退出当前线程
+    printf("never run\n");       // 不会执行
+}
+
+int main(void) {
+    pthread_t pthid;
+    pthread_create(&pthid, NULL, hello, NULL);
+    pthread_join(pthid, NULL);   // 等待线程结束
+    printf("main end\n");
+}
+```
+
+### 36.2 pthread_join — 线程等待
+
+```c
+int pthread_join(pthread_t thread, void **retval);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `thread` | 要等待的线程号 |
+| `retval` | 输出：保存线程 `pthread_exit` 的返回值 |
+
+**返回值**：成功 `0`，失败返回错误号（非零）。
+
+### 36.3 线程返回值模式
+
+```c
+// 12_exit_ret.c — 三种安全的返回值方式
+void *hello(void *data) {
+    static int a = 100;                  // 方式1：static 变量（生命周期全局）
+    int *p = malloc(sizeof(int));        // 方式2：malloc 堆内存（需 free）
+    *p = 200;
+
+    // pthread_exit(&a);                 // 安全：static 不随函数结束销毁
+    // pthread_exit(p);                  // 安全：堆内存，调用者 free
+    // pthread_exit(&data);              // 危险：局部变量地址，函数结束即无效
+}
+
+int main(void) {
+    void *ret;
+    pthread_join(pthid, &ret);
+    printf("ret : %d\n", *(int *)ret);   // 读取线程返回值
+}
+```
+
+> 不能返回线程函数**局部变量**的地址，函数结束后栈内存无效。
+
+### 36.4 线程与 fork 交互
+
+```c
+// 13_pthread_pro_relation.c — 线程中调用 fork
+void *hello(void *data) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        // 子进程：仅继承调用 fork 的那个线程
+        printf("child pid : %d\n", getpid());
+    }
+}
+```
+
+> `fork` 后子进程只包含调用 `fork` 的那个线程，其他线程在子进程中消失。
+
+---
+
+## 第37章 互斥锁（Mutex）
+
+### 37.1 问题引入
+
+10 个线程各写 1000 行到同一文件 → 不加锁时数据混乱/丢失：
+
+```c
+// 不加锁：10线程 × 1000行 = 预期10000行，实际可能只有9000+
+// 因为 write 不是原子操作，多个线程同时写会互相覆盖
+```
+
+### 37.2 静态锁初始化
+
+```c
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+```
+
+### 37.3 动态锁初始化与销毁
+
+```c
+int pthread_mutex_init(pthread_mutex_t *restrict mutex,
+                       const pthread_mutexattr_t *restrict attr);
+int pthread_mutex_destroy(pthread_mutex_t *mutex);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `mutex` | 锁变量地址 |
+| `attr` | 锁属性，`NULL` 表示快速互斥锁（默认） |
+
+**返回值**：成功 `0`，失败返回错误号。
+
+### 37.4 加锁与解锁
+
+```c
+int pthread_mutex_lock(pthread_mutex_t *mutex);       // 加锁（阻塞等待）
+int pthread_mutex_trylock(pthread_mutex_t *mutex);     // 尝试加锁（非阻塞）
+int pthread_mutex_unlock(pthread_mutex_t *mutex);      // 解锁
+```
+
+**返回值**：成功 `0`，失败返回错误号。
+
+### 37.5 多线程加锁写文件
+
+```c
+// 14_mul_file.c — 10 线程 + 互斥锁写文件，数据完整
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void *func(void *data) {
+    int fd = (int)data;
+    int i = 0;
+
+    pthread_mutex_lock(&mutex);          // 加锁：进入临界区
+
+    while (1) {
+        if (i == 1000) {
+            pthread_mutex_unlock(&mutex);// 解锁：离开临界区
+            pthread_exit(NULL);
+        }
+
+        snprintf(buf, sizeof(buf), "pthid : %lu pid : %d line : %d\n",
+                 pthread_self(), getpid(), i);
+        write(fd, buf, strlen(buf));
+        i++;
+    }
+
+    pthread_mutex_unlock(&mutex);        // 解锁
+    pthread_exit(NULL);
+}
+```
+
+> **注意**：互斥锁不可重复加锁（同一个线程连续 lock 两次会死锁）。  
+> **对比**：信号量用于多进程，互斥锁用于多线程。
+
+---
+
+## 第38章 线程清理函数
+
+### 38.1 pthread_cleanup_push — 注册清理函数
+
+```c
+void pthread_cleanup_push(void (*routine)(void *), void *arg);
+void pthread_cleanup_pop(int execute);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `routine` | 清理时要执行的函数指针 |
+| `arg` | 传递给清理函数的参数 |
+| `execute` | `0` 不执行清理函数，**非零** 执行 |
+
+### 38.2 三条重要规则
+
+1. **注册顺序与执行顺序相反**（栈结构：先注册后执行）
+2. **push 和 pop 必须一一对应**（编译器强制检查）
+3. **清理函数是否执行取决于 pop 的参数和代码位置**
+
+### 38.3 基本用法
+
+```c
+// 15_clean.c
+void hello(void *data) {
+    printf("hello! a = %d\n", *(int *)data);
+}
+void world(void *data) {
+    printf("world!\n");
+}
+
+int main(void) {
+    int a = 10;
+
+    pthread_cleanup_push(hello, &a);     // 先注册
+    pthread_cleanup_push(world, NULL);   // 后注册
+
+    printf("=================\n");
+
+    pthread_cleanup_pop(1);              // 先执行（后注册的先执行）→ world!
+    pthread_cleanup_pop(1);              // 后执行（先注册的后执行）→ hello! a = 10
+}
+```
+
+输出：
+```
+main start ...
+=================
+world!
+hello! a = 10
+main end ...
+```
+
+### 38.4 二级指针释放模式
+
+```c
+// 16_free.c — 清理函数用于 free 二级指针
+void hello(void *data) {
+    free(data);                          // 释放外层指针（int **）
+}
+void world(void *data) {
+    free(data);                          // 释放内层指针（int *）
+}
+
+int main(void) {
+    int **p = malloc(sizeof(int *));     // 外层
+    *p = malloc(sizeof(int));            // 内层
+
+    pthread_cleanup_push(hello, p);      // 先注册：释放 p
+    pthread_cleanup_push(world, *p);     // 后注册：释放 *p（内层先释放）
+
+    pthread_cleanup_pop(1);              // 先执行 world → free(*p)
+    pthread_cleanup_pop(1);              // 后执行 hello → free(p)
+}
+```
+
+> 释放顺序与分配顺序相反：先释放内层 `*p`，再释放外层 `p`。与注册顺序一致。
+
+---
+
 ## 本章小结
 
 ```
@@ -2763,4 +3280,9 @@ exec 族函数       ███████████████████�
 消息队列 msg      ████████████████████
 共享内存 shm      ████████████████████
 信号量 sem        ████████████████████
+线程基础          ████████████████████
+数据共享/参数传递 ████████████████████
+线程退出/等待     ████████████████████
+互斥锁 mutex      ████████████████████
+线程清理函数      ████████████████████
 ```

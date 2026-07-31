@@ -1,0 +1,234 @@
+
+
+widows : 192.168.2.118
+
+IPC :
+meg:
+	1 ftok => key
+	2 msgget => msgid
+	3 msgsnd
+	4 msgrcv  => type > 0
+		memcpy memmove
+	5 msgctl
+
+shm:
+	1 ftok => key
+	2 shmget => id
+	3 shmat  => addr
+	4 strcpy memcpy => write data
+	5 strcpy  memcpy printf => read data
+	6 shmdt
+	7 shmctl
+
+sem :
+	1 ftok => key
+	2 semget => id
+	3 semctl  => SETVAL val = 1
+	4 semop
+	5 semctl => IPC_RMID
+
+============================================
+线程：
+	一段可执行代码，并在内存中运行。
+	识别线程的唯一表示是线程号
+
+进程和线程区别：
+	执行效率：
+		线程比进程的执行效率要高
+		线程之间切换不需要时间上开销
+		进程之间的切换是需要实现上的开销
+	数据去安全：
+		进程比线程更安全
+		一个进程的异常，不会影响到另一个进程
+		一个线程异常，会影响当前进程的所有线程异常。
+	
+	进程是资源管理的最小单位
+	线程是执行流的最小单位
+
+关系：
+	一个程序，至少包括一个进程，而一个进程至少包括一个线程。
+
+特性：
+	动态性
+	共享性
+	并发性
+	异步性 ： 时间片轮转机制来实现。
+
+获取线程线程号：
+	pthread_t pthread_self(void);
+	typedef unsigned long int pthread_t; => %lu
+	Compile and link with -pthread.
+
+创建线程
+	int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+		void *(*start_routine) (void *), void *arg);
+
+	第一个参数：用于保存创建线程的线程号
+	第二个参数：表示用于创建线程属性
+		NULL 
+	第三个参数：表示线程创建成功后执行函数
+		1 函数返回类型必须是void *
+		2 函数参数必须是 void *
+	第三个参数：表示给创建好的线程传递参数
+		
+	返回值：
+		成功：0
+		失败：错误号  非零
+
+==========================================
+线程退出：
+	void pthread_exit(void *retval);
+	参数作为线程执行函数的返回值
+
+线程等待：
+	int pthread_join(pthread_t thread, void **retval);
+	第一个参数：表示等待某个线程
+	第二个参数：表示保存线程执行函数的返回值
+	返回值：
+		成功：0
+		失败：非零
+=======================================
+10个线程，每个线程写入1000行代码  => 10000行
+
+
+测试：
+	10个线程会造成数据混乱或者丢失
+	=> sem
+
+
+=============================================
+互斥锁：
+	静态锁：
+	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;	
+	动态锁：
+
+	锁的初始化
+	int pthread_mutex_init(pthread_mutex_t *restrict mutex,
+			const pthread_mutexattr_t *restrict attr);
+	第一个参数：表示锁变量
+	第二个参数：表示所得属性 
+		NULL : 表示快速互斥锁
+	返回值：
+		成功：0
+
+	int pthread_mutex_destroy(pthread_mutex_t *mutex);
+		参数：表示锁变量
+
+	设置加锁和解锁
+	int pthread_mutex_lock(pthread_mutex_t *mutex); //加锁
+	int pthread_mutex_trylock(pthread_mutex_t *mutex);//尝试加锁
+	int pthread_mutex_unlock(pthread_mutex_t *mutex);//解锁
+
+===================================================
+线程清理函数
+	注册函数
+	void pthread_cleanup_push(void (*routine)(void *),
+			void *arg);
+		第一份参数：函数指针，用于清理的时候去执行
+		第二个参数：表示执行清理函数参数
+
+	执行函数		
+	void pthread_cleanup_pop(int execute);
+		参数 ：0 表示不执行
+			非零 表示执行
+
+注意：
+	1 注册顺序和执行顺序是相反
+	2 注册函数和执行函数要一一对应
+	3 清理函数执行和代码所放的位置是有关的。
+
+练习：
+	int **p => 
+	
+	free(p)
+	free(*p)
+==================================================
+net : 就是用网络套接子编程就是网络编程
+
+OSI 7层网络参考模型
+	由低到高：
+		物理层：
+			设备：集线器
+			作用：
+				一个是把信号放大
+				将扩展网络物理接口
+			确保比特流(0 1)在物理线路上的传输
+
+		数据链路层：确保数据安全
+			设备：交换机
+				具备自动寻址能力和交换作用.
+			
+			检测数据有效性
+				1 奇偶校验
+					查看数据1的个数是奇数还是偶数。
+				2 和校验
+					累加到一块茫，然后看结果是0还是1
+
+			练习：输入一个无符号整形，判断是奇校验还是偶校验
+
+
+		网络层：
+			设备：路由器
+			作用：具有地址翻译、协议转换和数据格式转换等功能
+			大端模式：
+				高字节存储低地址或者低字节存储高地址
+			小端模式：
+				高字节存储高地址或者低字节存储低地址
+				
+		传输层： 端到端通讯
+			tcp : 面向连接的一种服务
+			udp : 面向非连接的一种服务
+		会话层：
+			确保服务建立。
+		表示层：
+			表示数据一种体现方式：加密或者解密 压缩或者解压缩
+		应用层：
+			表示用户用户连接
+
+TCP/IP 4层网络模型
+	由低到高：
+		主机到网络	： 比特流
+		网络层		： 数据帧
+		传输层		： 数据包
+		应用层		： 数据段
+
+========================================
+Ethernet II类型以太网帧的最小长度为64字节(6+6+2+46+4),最大长度为1518字
+节(6+6+2+1500+4)。
+
+Ethernet地址长度为48比特,共6个字节,如图所示。其中,前3字节为IEEE分配给厂商的厂商代码,后3字节为网络适配器编号
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

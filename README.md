@@ -1,6 +1,6 @@
 # 嵌入式与Linux开发学习笔记
 
-> 最后更新：2026-07-30
+> 最后更新：2026-07-31
 
 ## 目录
 
@@ -51,11 +51,19 @@
 
 | 序号 | 主题 | 文件 | 章节数 | 状态 |
 |------|------|------|--------|------|
-| 06 | Linux系统编程 | [06-Linux系统编程.md](notes/06-Linux系统编程.md) | 32章 | 📝 |
+| 06 | Linux系统编程 | [06-Linux系统编程.md](notes/06-Linux系统编程.md) | 38章 | ✅ |
 
-涵盖：kernel五大子系统、sys IO（open/close/read/write/lseek/dup/fcntl）、文件权限与特殊权限位（SUID/SGID/Sticky）、stat文件属性与类型检测、用户与组信息（getpwuid/crypt）、时间函数、文件系统与目录操作（readlink/chmod/chdir/opendir/tree）、进程（fork/vfork/exit/wait/孤儿/僵尸/守护/进程组/资源限制）、信号（kill/signal/alarm/setitimer+定时器链表）、exec族函数、匿名管道pipe、有名管道fifo（tell聊天）、IPC（消息队列/共享内存/信号量）
+涵盖：kernel五大子系统、sys IO（open/close/read/write/lseek/dup/fcntl）、文件权限与特殊权限位（SUID/SGID/Sticky）、stat文件属性与类型检测、用户与组信息（getpwuid/crypt）、时间函数、文件系统与目录操作（readlink/chmod/chdir/opendir/tree）、进程（fork/vfork/exit/wait/孤儿/僵尸/守护/进程组/资源限制）、信号（kill/signal/alarm/setitimer+定时器链表）、exec族函数、匿名管道pipe、有名管道fifo（tell聊天）、IPC（消息队列/共享内存/信号量）、线程（创建/数据共享/退出等待/互斥锁/清理函数）
 
-### 第六阶段：嵌入式开发
+### 第六阶段：网络编程
+
+| 序号 | 主题 | 文件 | 章节数 | 状态 |
+|------|------|------|--------|------|
+| 07 | Linux网络编程 | [07-Linux网络编程.md](notes/07-Linux网络编程.md) | 2章 | 📝 |
+
+涵盖：OSI七层参考模型（物理层/数据链路层/网络层/传输层）、TCP/IP四层模型、大小端模式与网络字节序、以太网帧格式（MAC地址/帧结构）、TCP vs UDP对比
+
+### 第七阶段：嵌入式开发
 *（待学习）*
 
 ---
@@ -67,7 +75,8 @@ Linux基础           ███████████████████�
 Vim编辑器           ████████████████████ 100%
 C语言基础           ████████████████████ 100%
 数据结构            ████████████████████ 100%
-Linux系统编程       ███████████░░░░░░░░░░░  56%
+Linux系统编程       ████████████████████ 100%
+Linux网络编程       ██░░░░░░░░░░░░░░░░░░  10%
 
 ```
 
