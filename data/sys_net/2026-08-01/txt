@@ -1,0 +1,224 @@
+
+
+网络模型：
+	7层网络互联参考模型：
+		物理层 数据链路层  网络层
+		传输层 会话层 表示层 应用层
+	TCP/IP：
+		物理层 网络层 传输层 应用层
+		比特流 数据帧 数据包 数据段
+
+TCP/IP实现原理
+	
+MAC地址
+
+IP地址：
+	地址解析协议(ARP address resolution protocol)： ip => mac
+	逆地址解析协议(RARP)：mac => ip
+
+	IPV4: 32bit
+		
+	IPV6: 128bit
+
+	ip = net + host
+
+
+ip：本地回环
+	127.0.0.1 => 本机
+
+临时指令：
+	ifconfig eth0 192.168.0.?
+
+网卡配置文件
+	vim /etc/sysconfig/network-scripts/ifcfg-Auto_eth0
+图形界面配置
+	system-config-network
+
+
+ping :
+	Ping的主要功能
+	– 检测本机与被测主机之间网络是否相通
+	– 检测本机与被测主机之间网络的网速
+	– 测试域名解析(DNS)是否有效
+
+案例： 检测本机是否可以ping的通192.168.2.254 指定ping次数 3次
+	[root@www networks]# ping 192.168.2.254 -c 3
+	PING 192.168.2.254 (192.168.2.254) 56(84) bytes of data.
+	64 bytes from 192.168.2.254: icmp_seq=1 ttl=64 time=0.039 ms
+	64 bytes from 192.168.2.254: icmp_seq=2 ttl=64 time=0.010 ms
+	64 bytes from 192.168.2.254: icmp_seq=3 ttl=64 time=0.018 ms
+
+	--- 192.168.2.254 ping statistics ---
+	3 packets transmitted, 3 received, 0% packet loss, time 1999ms
+	rtt min/avg/max/mdev = 0.010/0.022/0.039/0.012 ms
+
+	//ctrl + c => 终止指令执行
+	以下表示网络不通
+	[root@www networks]# ping 192.168.2.30 -c 3
+	PING 192.168.2.30 (192.168.2.30) 56(84) bytes of data.
+	From 192.168.2.254 icmp_seq=1 Destination Host Unreachable
+	From 192.168.2.254 icmp_seq=2 Destination Host Unreachable
+	From 192.168.2.254 icmp_seq=3 Destination Host Unreachable
+
+	--- 192.168.2.30 ping statistics ---
+	3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 3001ms
+	pipe 3
+
+
+协议(protocol)就是通讯双方都要遵守的一系列规则
+
+TCP的三次握手（三次握手实现原理）
+	第一握手：客户端向服务器发送请求建立连接的SYN包
+		TCP包头：发送序列号（X）保存报到tcp包发送序列号字段中
+			同时设置tcp标志SYN位为1
+	第二次握手：服务器接受到客户端的请求包后会向客户端发送确认包(ACK)
+		TCP ： 发送序列号(Y)保存到发送字段序列号中，并将请求包的序列号(X + 1)保存到接受字段的序列号中， 且设置标志位ACK和SYN位置1.
+
+	第三次握手：客户端接受到服务器的确认包后会再次向服务器发送确认包
+		TCP : 服务器发送序列号(Y + 1)保存到接受字段的序列中，并设置ACK位为1， SYN位置0，同时把自己的序号量(x+1)保存到数据的字段中
+
+	三次握手成功，则双方处于通讯状态。
+	第四挥手：
+		如果数据发送完成，则双方通信状态则须拆除(断开连接)。
+
+======================================================
+tcp:
+	客户端：
+		1 创建网络套接子
+			int socket(int domain, int type, int protocol);
+			第一个参数：表示地址家族
+				AF_INET             IPv4 Internet protocols
+			第二个参数：表示协议类型
+				SOCK_STREAM		表示TCP协议套接子类型
+				SOCK_DGRAM		表示UDP协议套接子类型
+				SOCK_RAW		表示原始套接子类型
+
+			第三个参数：表示协议
+				0 : tcp or udp => 第二个参数决定
+				IPPROTO_TCP ： 表示tcp协议
+				IPPROTO_UDP	： 表示UDP协议
+			返回值：
+				成功：网络套接子文件描述符
+				失败：-1
+
+		2 请求建立连接：
+			int connect(int sockfd, const struct sockaddr *addr,
+			                   socklen_t addrlen);
+			第一个参数：表示套接子的文件描述符 scoket返回值
+
+			第二个参数：表示套接子地址结构体 => 实例化
+			struct sockaddr_in {
+				//地址家族  2
+				sa_family_t    sin_family; /* address family: AF_INET */
+				//端口号//0 ～ 65535  2
+				in_port_t      sin_port;   /* port in network byte order */
+				//ip地址192.168.2.254  4
+				struct in_addr sin_addr;   /* internet address */
+			};
+
+			/* Internet address. */
+			struct in_addr {
+				uint32_t       s_addr;     /* address in network
+
+		第三个参数：结构体大小 => 16
+			
+		返回值：
+			成功：0
+			失败：-1
+========================================
+端口号字节序转换
+	主机字节序转换成网络字节序
+	uint32_t htonl(uint32_t hostlong);//长整形
+	uint16_t htons(uint16_t hostshort);//短整形
+
+	网络字节序转换成主机字节序
+	uint32_t ntohl(uint32_t netlong);
+	uint16_t ntohs(uint16_t netshort);
+
+===========================================
+字符串ip地址转换成网络字节序ip地址
+	in_addr_t inet_addr(const char *cp); //把主机ip转换成网络字节序
+	in_addr_t inet_network(const char *cp);//把主机ip转换成二进制网络字节序
+	char *inet_ntoa(struct in_addr in); //网络ip地址转换成本机ip
+==========================================
+	服务器：
+		1 socket
+		2 绑定端口和ip
+			int bind(int sockfd, const struct sockaddr *addr,
+			                socklen_t addrlen);
+
+			第一个参数：表示套接子文件描述符
+			第二个参数：套接子结构体 实例化
+			第三个参数：表示结构体大小
+			返回值：
+		3 监听：
+			int listen(int sockfd, int backlog);
+			第一个参数：表示套接子文件描述符
+			第二个参数：表示监听用户个数
+			返回值：
+				
+		4 连接用户
+			int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+			第一个参数：表示套接子文件描述符
+			第二个参数：表示套接子结构体  不需要实例化
+			第三个参数：表示结构体大小
+			返回值：
+				成功：文件描述符
+				失败：-1
+
+
+注意：
+	1 sd: 用于连接用户
+	  fd: 用于区分不同的用户，且通过fd进行数据处理
+	2 端口号：
+		服务端口号：用于建立连接 服务指定
+		数据端口号：用于传输数据 系统随机分配
+			
+
+		
+练习：发送学生级结构体
+	struct cls_t{
+		char name[64];
+		int fd;
+		int age;
+		char sex;
+		//......
+	};
+
+
+练习：
+	测试那些端口不可以使用
+
+
+====================================
+发送数据：
+	ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+	第一个参数：表示套接子文件描述符
+	第二个参数：表示存储数据空间地址
+	第三个按数：表示发送数据个数
+	第四个参数：表示标志位 0
+	返回值：
+		成功：表示发送字节
+		失败：-1
+
+接受数据：
+	ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+	第一个参数：表示套接子文件描述符
+	第二个参数：表示接受数据空间地址
+	第三个参数：表示空间大小
+	第四个参胡：标志位0
+	返回值：
+		成功：接受数据个数
+		失败：-1
+
+
+homework:
+	1 实现tell
+
+
+
+
+
+
+
+
