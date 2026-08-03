@@ -1,6 +1,6 @@
 # 嵌入式与Linux开发学习笔记
 
-> 最后更新：2026-08-01
+> 最后更新：2026-08-03
 
 ## 目录
 
@@ -59,9 +59,9 @@
 
 | 序号 | 主题 | 文件 | 章节数 | 状态 |
 |------|------|------|--------|------|
-| 07 | Linux网络编程 | [07-Linux网络编程.md](notes/07-Linux网络编程.md) | 9章 | 📝 |
+| 07 | Linux网络编程 | [07-Linux网络编程.md](notes/07-Linux网络编程.md) | 15章 | ✅ |
 
-涵盖：OSI七层参考模型（物理层/数据链路层/网络层/传输层）、TCP/IP四层模型、大小端模式与网络字节序、以太网帧格式（MAC地址/帧结构）、TCP vs UDP对比、IP地址与ARP/RARP/ping、TCP三次握手/四次挥手、Socket编程（socket/connect/bind/listen/accept）、字节序转换（htonl/htons/ntohl/ntohs）、IP地址转换（inet_addr/inet_ntoa）、TCP数据传输（send/recv）、多进程并发服务器（fork+accept）、TCP文件传输（文本/视频+流控）
+涵盖：OSI七层参考模型、TCP/IP四层模型、大小端与网络字节序、以太网帧格式、TCP vs UDP、IP地址与ARP/RARP/ping、TCP三次握手/四次挥手、Socket编程（socket/connect/bind/listen/accept）、字节序转换（htonl/htons）、IP转换（inet_addr/inet_ntoa）、TCP数据传输（send/recv）、多进程并发服务器（fork+accept）、TCP文件传输、TCP版tell聊天（VT码分屏）、UDP编程（sendto/recvfrom）、广播（SO_BROADCAST）、多播/组播（IP_ADD_MEMBERSHIP/D类地址）、IO复用（select/FD_SET/FD_ISSET）
 
 ### 第七阶段：嵌入式开发
 *（待学习）*
@@ -76,7 +76,7 @@ Vim编辑器           ███████████████████
 C语言基础           ████████████████████ 100%
 数据结构            ████████████████████ 100%
 Linux系统编程       ████████████████████ 100%
-Linux网络编程       ██████████░░░░░░░░░░  50%
+Linux网络编程       ████████████████████ 100%
 
 ```
 

@@ -1,0 +1,208 @@
+
+
+
+windows : 192.168.2.117
+
+client :
+	1 socket => sd
+	2 connect => server_ip
+	3 read/write send/recv
+	4 close
+
+server :
+	1 socket => sd => connect user
+	2 bind => my_ip server_port
+	3 listen
+	4 accept => fd => data
+	5 read/write  send/recv
+	6 close
+
+实现ssh:
+	创建普通用户
+	useradd username
+	设置密码
+	passwd username
+
+	重启sshd服务
+	service sshd restart
+	
+	登录：
+	ssh username@service_ip
+
+=========================================
+tell:
+	
+
+=========================================
+UDP:
+	面向非连接服务
+
+客户端：
+	1 创建建立连接的套接子
+	2 发送数据
+	size_t sendto(int sockfd, const void *buf, size_t len, int flags,
+			const struct sockaddr *dest_addr, socklen_t addrlen);
+	第一个参数：表示套接子文件描述符
+	第二个参数：表示发送数据空间地址
+	第三个参数：表示发送数据大小
+	第四个参数：表示标志位 0
+	第五个参数：表示套接子结构体 实例化
+	第六个参数：表示结构体大小
+	返回值：
+		成功：发送字符个数
+		失败：-1
+
+
+
+服务器：
+	1 socket
+	2 bind
+		int bind(int sockfd, const struct sockaddr *addr,
+		                socklen_t addrlen);
+	3 接受数据
+	ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+			struct sockaddr *src_addr, socklen_t *addrlen);
+	第一个参数：表示套接子文件描述符
+	第二个参数：表示存储数据空间地址
+	第三个参数：表示存储数据空间大小
+	第四个参数：表示标志位 0
+		默认阻塞的方式等待客户端发送数据
+	第五个参数：表示发送方的信息结构体 ，不需要实例化
+	第六个参数：表示结构体大小 指针
+	返回值：
+		成功：接受数据个数
+		失败：-1
+
+练习：读取一篇文章
+
+
+=================================================
+单播 ： 一对一
+	tcp udp
+
+广播: 一对多(同一网段的所有用户)
+	ip 网络号一致，主机号全1
+	UDP基础上
+
+	客户端：发送端
+		设置网络套接子的类型为广播的一种方式
+		int getsockopt(int sockfd, int level, int optname,
+				void *optval, socklen_t *optlen);
+		int setsockopt(int sockfd, int level, int optname,
+				const void *optval, socklen_t optlen);
+		第一个参数：表示套接子文件描述符 socket返回值
+		第二个参数：表示级别
+			SOL_SOCKET	： 表示普通套接子级别
+			IPPROTO_IP	： 表示ipv4级别
+			IPPROTO_IPV6:  表示ipv6级别
+		第三个参数：表示给套接子执行指令
+			IP_ADD_MEMBERSHIP ： 表示添加一个用户到多播组中
+			IP_DROP_MEMBERSHIP： 表示从多播组中删除用户
+			SO_BROADCAST	  :  表示多播
+
+		第四个参数：表示操作开关
+			变量：0 表示关闭多播
+			      1 表示开启多播
+		第五个参数：表示操作开关大小
+		
+		返回值：
+			成功：0
+			失败：-1
+
+
+	
+	服务区：接受端
+
+=================================================
+
+多播 也叫组播 一堆多(组里的所有成员)
+	
+	多播号：D类：224.0.0.0 ~ 239.255.255.255
+		224.1.2.3
+
+	服务器：
+	int setsockopt(int sockfd, int level, int optname,
+			const void *optval, socklen_t optlen);
+	
+	第一个参数：表示套接子文件描述符
+	第二个参数：表示级别
+		IPPROTO_IP  ： 表示ipv4级别   多播用就是这个级别
+	第三个参数：操作指令
+		IP_ADD_MEMBERSHIP
+		struct ip_mreqn {
+			//表示多播号 224.1.2.3
+			struct in_addr imr_multiaddr; /* IP multicast group
+											 address */
+			//表示用户ip	 ifconfig 							 
+			struct in_addr imr_address;   /* IP address of local
+											 interface */
+			//小标 0								 
+			int            imr_ifindex;   /* interface index */
+		};
+
+	第四个参数：表示添加结构体信息
+	第五个结束：表示结构体大小
+====================================================
+io复用
+	int select(int nfds, fd_set *readfds, fd_set *writefds,
+			fd_set *exceptfds, struct timeval *timeout);
+		第一个参数：表示打开文件描述符最大值 + 1
+		第二个参数：表示文件描述符读集 NULL
+		第三个参数：表示文件描述符写集 NULL
+		第四个参数：表示文件描述符异常集合 NULL
+		第五个参数：表示时间结构体
+			默认是阻塞等待文件描述符状态
+			struct timeval {
+				long    tv_sec;         /* seconds */
+				long    tv_usec;        /* microseconds */
+			};
+			时间设置位0 ，则默认是轮寻的方接受用户
+			时间设置为有效时间，则以等到设置时间检测用户信息
+			NULL ：   睡眠的方式等到用户输入
+	返回值：
+		成功：返回文件描述符个数（用户数）
+		0 ： 表示超时
+		-1 : 表示失败
+
+
+	void FD_CLR(int fd, fd_set *set); //从文件描述符集合中删除
+	int  FD_ISSET(int fd, fd_set *set);//判断文件描述符是否在集合中
+	void FD_SET(int fd, fd_set *set);  //添加文件描述符到集合中
+	void FD_ZERO(fd_set *set); //清空文件描述符集合
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

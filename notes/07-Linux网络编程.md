@@ -8,7 +8,8 @@
 
 | 日期 | 章节 | 更新内容 |
 |------|------|----------|
-| 2026-08-01 | 第3-8章 | TCP/IP基础（IP地址/IPv4-IPv6/ARP-RARP/回环地址/网卡配置/ping）、TCP三次握手与四次挥手、Socket编程基础（socket/connect/bind/listen/accept+字节序转换htonl-htons-ntohl-ntohs+IP地址转换inet_addr-inet_ntoa）、TCP数据传输（send/recv/字符串传输）、多进程并发服务器（fork+accept）、TCP文件传输（文本文件/大视频文件+usleep流控）、课后作业（tell聊天、端口扫描） |
+| 2026-08-03 | 第10-15章 | TCP回顾（流程+SSH）、TCP版tell聊天（双进程+VT码分屏）、UDP编程（SOCK_DGRAM/sendto/recvfrom/对比TCP）、UDP文件传输（逐字节+流控）、UDP多用户循环接收、广播（setsockopt+SO_BROADCAST+广播IP）、多播/组播（IP_ADD_MEMBERSHIP/IP_DROP_MEMBERSHIP/IP_MULTICAST_TTL+struct ip_mreqn+D类地址224.x）、IO复用（select+FD_ZERO/FD_SET/FD_ISSET/FD_CLR+struct timeval三种模式）、课程完结 |
+| 2026-08-01 | 第3-9章 | TCP/IP基础（IP地址/IPv4-IPv6/ARP-RARP/回环地址/网卡配置/ping）、TCP三次握手与四次挥手、Socket编程基础（socket/connect/bind/listen/accept+字节序转换htonl-htons-ntohl-ntohs+IP地址转换inet_addr-inet_ntoa）、TCP数据传输（send/recv/字符串传输）、多进程并发服务器（fork+accept）、TCP文件传输（文本文件/大视频文件+usleep流控）、课后作业（多线程素数、端口扫描、TCP版tell） |
 | 2026-07-31 | 第1-2章 | 新建笔记：OSI七层参考模型（物理层/数据链路层/网络层/传输层）、TCP/IP四层模型、大小端模式、以太网帧格式（64-1518字节）、TCP vs UDP对比、课后作业（奇偶校验） |
 
 ---
@@ -729,6 +730,524 @@ for (i = 0; i < 65535; i++) {
 
 ---
 
+## 第10章 TCP 回顾与 tell 聊天
+
+### 10.1 TCP 编程流程回顾
+
+```
+客户端                              服务器
+socket()                           socket()
+connect()                          bind()
+  |                                listen()
+  |    ==== 三次握手 ====          accept()
+  |                                  |
+send()/recv() <---- 数据通讯 ---> send()/recv()
+  |                                  |
+close()                           close()
+```
+
+### 10.2 SSH 服务配置
+
+```bash
+useradd username              # 创建普通用户
+passwd username               # 设置密码
+service sshd restart          # 重启 SSH 服务
+ssh username@server_ip        # 登录
+```
+
+### 10.3 TCP 版 tell 聊天
+
+基于 TCP 实现的一对一双向聊天，双方各自 fork 子进程处理读取，父进程处理写入，使用 VT 码分屏显示。
+
+```c
+// 02_tell/zhangsan.c — 张三（客户端，先接收再发送）
+#define INPUT  10      // 输入行
+#define OUTPUT 5       // 输出行
+
+// 1. socket + connect
+sd = socket(AF_INET, SOCK_STREAM, 0);
+ser.sin_family = AF_INET;
+ser.sin_port = htons(PORT);
+ser.sin_addr.s_addr = inet_addr(argv[1]);
+connect(sd, (struct sockaddr *)&ser, sizeof(ser));
+
+system("clear");
+
+if (fork() == 0) {
+    // 子进程：读取对方消息
+    printf("\033[%d;10Hlisi : ", OUTPUT);
+    while (1) {
+        read(sd, buf, sizeof(buf));
+        printf("\033[%d;10Hlisi : \033[K%s\033[u", OUTPUT, buf);
+        if (!strcmp(buf, "goodbye")) break;
+    }
+    exit(0);
+}
+
+// 父进程：发送消息
+usleep(100);
+while (1) {
+    printf("\033[%d;10Hzhangsan : \033[K\033[s", INPUT);
+    fgets(buf, sizeof(buf), stdin);
+    // 去除换行符
+    if (buf[strlen(buf) - 1] == '\n')
+        buf[strlen(buf) - 1] = '\0';
+
+    write(sd, buf, strlen(buf) + 1);
+    if (!strcmp(buf, "goodbye")) break;
+}
+wait(NULL);
+```
+
+```c
+// 02_tell/lisi.c — 李四（服务器，先发送再接收）
+// socket + bind + listen + accept
+
+if (fork() == 0) {
+    // 子进程：读取张三消息
+    while (1) {
+        read(fd, buf, sizeof(buf));
+        printf("\033[%d;10Hzhangsan : %s\033[K\033[u", OUTPUT, buf);
+        if (!strcmp(buf, "goodbye")) break;
+    }
+    exit(0);
+}
+
+// 父进程：发送消息
+// 同张三模式，VT 码位置互换
+```
+
+> **VT 码**：`\033[%d;10H` 定位光标，`\033[K` 清除行，`\033[s` 保存位置，`\033[u` 恢复位置。
+
+---
+
+## 第11章 UDP 编程
+
+UDP（User Datagram Protocol）是**面向非连接**的服务，不需要三次握手。
+
+### 11.1 TCP vs UDP 对比
+
+| 特性 | TCP (`SOCK_STREAM`) | UDP (`SOCK_DGRAM`) |
+|------|---------------------|---------------------|
+| 连接 | 面向连接（三次握手） | 面向非连接 |
+| 可靠性 | 可靠（确认/重传） | 不可靠（尽力而为） |
+| 顺序 | 保证顺序 | 不保证顺序 |
+| 效率 | 低 | 高 |
+| API | connect + send/recv | sendto + recvfrom |
+| 适用 | 文件传输、Web | 直播、视频、DNS |
+
+### 11.2 UDP 编程流程
+
+```
+客户端                              服务器
+socket(SOCK_DGRAM)                  socket(SOCK_DGRAM)
+  |                                   |
+sendto() ---- 直接发送数据 ---->   bind()
+  |                                   |
+  |                               recvfrom()
+```
+
+### 11.3 sendto — UDP 发送数据
+
+```c
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+               const struct sockaddr *dest_addr, socklen_t addrlen);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `sockfd` | 套接字文件描述符 |
+| `buf` | 待发送数据地址 |
+| `len` | 发送数据大小 |
+| `flags` | 标志位，通常 `0` |
+| `dest_addr` | 目标地址结构体（**需实例化**，强转） |
+| `addrlen` | 结构体大小 |
+
+**返回值**：成功返回发送字节数，失败 `-1`。
+
+```c
+// 03_udp/client.c
+sd = socket(AF_INET, SOCK_DGRAM, 0);
+
+dest.sin_family = AF_INET;
+dest.sin_port = htons(atoi(argv[1]));
+dest.sin_addr.s_addr = inet_addr(argv[2]);
+
+sendto(sd, argv[3], strlen(argv[3]) + 1, 0,
+       (struct sockaddr *)&dest, sizeof(dest));
+```
+
+### 11.4 recvfrom — UDP 接收数据
+
+```c
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+                 struct sockaddr *src_addr, socklen_t *addrlen);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `sockfd` | 套接字文件描述符 |
+| `buf` | 接收数据缓冲区 |
+| `len` | 缓冲区大小 |
+| `flags` | 标志位，`0` 表示阻塞等待 |
+| `src_addr` | 输出：发送方地址信息（**不需要实例化**） |
+| `addrlen` | 输入/输出：结构体大小指针 |
+
+**返回值**：成功返回接收数据字节数，失败 `-1`。
+
+```c
+// 03_udp/server.c
+sd = socket(AF_INET, SOCK_DGRAM, 0);
+
+my_addr.sin_family = AF_INET;
+my_addr.sin_port = htons(atoi(argv[1]));
+my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+bind(sd, (struct sockaddr *)&my_addr, sizeof(my_addr));
+
+int len = sizeof(from);
+ret = recvfrom(sd, buf, sizeof(buf), 0,
+               (struct sockaddr *)&from, &len);
+
+printf("ip : %s port : %d message : %s\n",
+       inet_ntoa(from.sin_addr), ntohs(from.sin_port), buf);
+```
+
+### 11.5 UDP 多用户循环接收
+
+服务器循环调用 `recvfrom` 可持续接收多个客户端的 UDP 消息：
+
+```c
+// 04_user/server.c — 循环接收
+while (1) {
+    ret = recvfrom(sd, buf, sizeof(buf), 0,
+                   (struct sockaddr *)&from, &len);
+    printf("ip : %s port : %d message : %s\n",
+           inet_ntoa(from.sin_addr), ntohs(from.sin_port), buf);
+}
+```
+
+---
+
+## 第12章 UDP 文件传输
+
+UDP 逐字节发送文件，利用 `usleep` 控制发送速率：
+
+```c
+// 05_udp_file/client.c — UDP 发送文件
+fd = open(argv[3], O_RDONLY);
+
+dest.sin_family = AF_INET;
+dest.sin_port = htons(atoi(argv[1]));
+dest.sin_addr.s_addr = inet_addr(argv[2]);
+
+while (1) {
+    ret = read(fd, &ch, 1);
+    if (ret <= 0) break;
+
+    sendto(sd, &ch, 1, 0, (struct sockaddr *)&dest, sizeof(dest));
+    usleep(100000);                         // 100ms 流控
+}
+```
+
+```c
+// 05_udp_file/server.c — UDP 接收文件
+while (1) {
+    ret = recvfrom(sd, &ch, 1, 0, (struct sockaddr *)&from, &len);
+    if (ret == -1) break;
+    putchar(ch);
+    fflush(NULL);                           // 立即刷新
+}
+```
+
+---
+
+## 第13章 广播（Broadcast）
+
+广播是**一对多**通讯，向同一网段的所有用户发送数据。广播 IP 地址：网络号一致，主机号全为 1（如 `192.168.2.255`）。
+
+基于 UDP 实现。
+
+### 13.1 setsockopt — 设置套接字选项
+
+```c
+int getsockopt(int sockfd, int level, int optname,
+               void *optval, socklen_t *optlen);
+int setsockopt(int sockfd, int level, int optname,
+               const void *optval, socklen_t optlen);
+```
+
+| 参数 | 选项 | 说明 |
+|------|------|------|
+| `level` | `SOL_SOCKET` | 普通套接字级别 |
+| | `IPPROTO_IP` | IPv4 级别 |
+| | `IPPROTO_IPV6` | IPv6 级别 |
+| `optname` | `SO_BROADCAST` | 广播开关 |
+| | `SO_REUSEADDR` | 端口重用 |
+| | `IP_ADD_MEMBERSHIP` | 添加用户到多播组 |
+| | `IP_DROP_MEMBERSHIP` | 从多播组删除用户 |
+| `optval` | `&val` | `0` 关闭，`1` 开启 |
+
+**返回值**：成功 `0`，失败 `-1`。
+
+### 13.2 广播发送端
+
+```c
+// 06_broadcast/client.c
+int val = 1;
+
+sd = socket(AF_INET, SOCK_DGRAM, 0);
+
+// 设置广播权限
+setsockopt(sd, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
+
+dest.sin_family = AF_INET;
+dest.sin_port = htons(atoi(argv[1]));
+dest.sin_addr.s_addr = inet_addr(argv[2]);  // 广播地址如 192.168.2.255
+
+// 循环发送文件
+while (1) {
+    ret = read(fd, &ch, 1);
+    if (ret <= 0) {
+        lseek(fd, 0, SEEK_SET);             // 回到文件开头循环
+        continue;
+    }
+    sendto(sd, &ch, 1, 0, (struct sockaddr *)&dest, sizeof(dest));
+    usleep(300000);                          // 300ms 流控
+}
+```
+
+### 13.3 广播接收端
+
+```c
+// 06_broadcast/server.c
+int val = 1;
+
+sd = socket(AF_INET, SOCK_DGRAM, 0);
+
+// 设置端口重用
+setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+my_addr.sin_family = AF_INET;
+my_addr.sin_port = htons(atoi(argv[1]));
+my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+bind(sd, (struct sockaddr *)&my_addr, sizeof(my_addr));
+
+while (1) {
+    ret = recvfrom(sd, &ch, 1, 0, (struct sockaddr *)&from, &len);
+    if (ret == -1) break;
+    putchar(ch);
+    fflush(NULL);
+}
+```
+
+> `SO_REUSEADDR` 允许多个进程绑定同一端口，广播接收端必须设置。
+
+---
+
+## 第14章 多播/组播（Multicast）
+
+多播（组播）是**一对多**通讯，只向**组内的成员**发送数据。基于 UDP 实现。
+
+**D 类地址**：`224.0.0.0 ~ 239.255.255.255`（多播号），如 `224.1.2.3`。
+
+### 14.1 struct ip_mreqn — 多播组结构体
+
+```c
+struct ip_mreqn {
+    struct in_addr imr_multiaddr;    // 多播组 IP（如 224.1.2.3）
+    struct in_addr imr_address;      // 本机 IP（ifconfig 查看）
+    int            imr_ifindex;      // 网卡索引号，0 表示默认
+};
+```
+
+### 14.2 多播发送端
+
+```c
+// 07_mul/client.c
+sd = socket(AF_INET, SOCK_DGRAM, 0);
+
+// 设置 TTL（生存时间，跨网段跳数）
+int ttl = 64;
+setsockopt(sd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+
+// 禁止接收自己发出的组包（关闭回环）
+int loop = 1;
+setsockopt(sd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
+
+dest.sin_family = AF_INET;
+dest.sin_port = htons(atoi(argv[1]));
+dest.sin_addr.s_addr = inet_addr(argv[2]);  // 多播地址 224.1.2.3
+
+while (1) {
+    ret = read(fd, &ch, 1);
+    if (ret <= 0) {
+        lseek(fd, 0, SEEK_SET);
+        continue;
+    }
+    sendto(sd, &ch, 1, 0, (struct sockaddr *)&dest, sizeof(dest));
+    usleep(300000);
+}
+```
+
+### 14.3 多播接收端
+
+```c
+// 07_mul/server.c
+struct ip_mreqn mr;
+
+sd = socket(AF_INET, SOCK_DGRAM, 0);
+
+// 端口重用
+setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+// bind
+my_addr.sin_family = AF_INET;
+my_addr.sin_port = htons(atoi(argv[1]));
+my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+bind(sd, (struct sockaddr *)&my_addr, sizeof(my_addr));
+
+// 加入多播组
+mr.imr_multiaddr.s_addr = inet_addr(argv[2]);   // 多播组 IP
+mr.imr_address.s_addr = htonl(INADDR_ANY);      // 本机 IP
+mr.imr_ifindex = 0;                              // 默认网卡
+setsockopt(sd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mr, sizeof(mr));
+
+// 接收数据
+while (1) {
+    recvfrom(sd, &ch, 1, 0, (struct sockaddr *)&from, &len);
+    putchar(ch);
+    fflush(NULL);
+}
+
+// 离开多播组
+setsockopt(sd, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mr, sizeof(mr));
+```
+
+### 14.4 单播/广播/多播对比
+
+| 类型 | 通讯模式 | 范围 | 实现 |
+|------|----------|------|------|
+| **单播** | 一对一 | 指定 IP | TCP/UDP 默认 |
+| **广播** | 一对多 | 同一网段所有主机 | UDP + `SO_BROADCAST` |
+| **多播/组播** | 一对多 | 加入组的成员 | UDP + `IP_ADD_MEMBERSHIP` |
+
+---
+
+## 第15章 IO 复用（select）
+
+`select` 允许一个进程同时监控多个文件描述符（键盘、管道、套接字等），实现 IO 多路复用。
+
+### 15.1 select 函数
+
+```c
+#include <sys/select.h>
+
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+           fd_set *exceptfds, struct timeval *timeout);
+```
+
+| 参数 | 说明 |
+|------|------|
+| `nfds` | 监控的文件描述符**最大值 + 1** |
+| `readfds` | 读集合（监控可读），`NULL` 不监控 |
+| `writefds` | 写集合（监控可写），`NULL` 不监控 |
+| `exceptfds` | 异常集合，`NULL` 不监控 |
+| `timeout` | 超时时间 |
+
+**返回值**：成功返回就绪的文件描述符个数，`0` 超时，`-1` 失败。
+
+### 15.2 struct timeval — 超时设置
+
+```c
+struct timeval {
+    long    tv_sec;      // 秒
+    long    tv_usec;     // 微秒
+};
+```
+
+| 设置 | 模式 |
+|------|------|
+| `NULL` | **阻塞等待**（睡眠方式等待用户输入） |
+| `{0, 0}` | **轮询**（立即返回，不阻塞） |
+| `{N, 0}` | **超时等待**（等待 N 秒后返回） |
+
+### 15.3 FD 宏操作
+
+```c
+void FD_ZERO(fd_set *set);                  // 清空集合
+void FD_SET(int fd, fd_set *set);           // 添加 fd 到集合
+void FD_CLR(int fd, fd_set *set);           // 从集合删除 fd
+int  FD_ISSET(int fd, fd_set *set);         // 判断 fd 是否在集合中（可读/可写）
+```
+
+### 15.4 select 示例：键盘 + 管道
+
+```c
+// 08_select.c — 同时监控键盘输入和管道文件
+fd_set fdr;
+int fd = open("./ken", O_RDWR);
+
+while (1) {
+    FD_ZERO(&fdr);                          // 每次循环清空
+    FD_SET(0, &fdr);                        // 添加键盘（stdin）
+    FD_SET(fd, &fdr);                       // 添加管道文件
+
+    ret = select(fd + 1, &fdr, NULL, NULL, NULL);  // 阻塞等待
+
+    if (ret > 0) {
+        if (FD_ISSET(fd, &fdr)) {
+            // 管道文件可读
+            read(fd, buf, sizeof(buf));
+            printf("fifo : %s\n", buf);
+        }
+        else if (FD_ISSET(0, &fdr)) {
+            // 键盘可读
+            read(0, buf, sizeof(buf));
+            printf("stdin : %s\n", buf);
+            write(fd, buf, strlen(buf) + 1);     // 写入管道
+        }
+    }
+}
+```
+
+### 15.5 select + 套接字模式
+
+select 同样可监控多个套接字 fd，实现单进程处理多客户端：
+
+```c
+fd_set fdr;
+int maxfd = sd;                             // sd 为监听套接字
+
+while (1) {
+    FD_ZERO(&fdr);
+    FD_SET(sd, &fdr);                       // 监控监听套接字
+
+    for (i = 0; i < client_count; i++) {
+        FD_SET(clients[i], &fdr);           // 监控所有客户端 fd
+        if (clients[i] > maxfd) maxfd = clients[i];
+    }
+
+    select(maxfd + 1, &fdr, NULL, NULL, NULL);
+
+    if (FD_ISSET(sd, &fdr)) {
+        // 新连接
+        fd = accept(sd, ...);
+        clients[client_count++] = fd;
+    }
+
+    for (i = 0; i < client_count; i++) {
+        if (FD_ISSET(clients[i], &fdr)) {
+            // 客户端发送了数据
+            recv(clients[i], buf, sizeof(buf), 0);
+        }
+    }
+}
+```
+
+> select 使得单进程/线程即可并发处理多个客户端，是 IO 多路复用的核心。
+
+---
+
 ## 本章小结
 
 ```
@@ -745,5 +1264,10 @@ Socket 编程基础  ███████████████████�
 TCP 数据传输     ████████████████████
 多进程并发服务器  ████████████████████
 TCP 文件传输     ████████████████████
-课后作业         ████████████████████
+TCP tell 聊天    ████████████████████
+UDP 编程         ████████████████████
+UDP 文件传输     ████████████████████
+广播 Broadcast   ████████████████████
+多播/组播        ████████████████████
+IO复用 select    ████████████████████
 ```
