@@ -1,6 +1,6 @@
 # 嵌入式与Linux开发学习笔记
 
-> 最后更新：2026-08-03
+> 最后更新：2026-08-07
 
 ## 目录
 
@@ -8,20 +8,20 @@
 
 | 序号 | 主题 | 文件 | 状态 |
 |------|------|------|------|
-| 01 | Linux基础与终端操作 | [01-Linux基础.md](notes/01-Linux基础.md) | ✅ |
-| 02 | Linux文件与目录操作 | [02-Linux文件与目录操作.md](notes/02-Linux文件与目录操作.md) | ✅ |
+| 01 | Linux基础与终端操作 | [01-Linux基础.md](notes/Linux基础/01-Linux基础.md) | ✅ |
+| 02 | Linux文件与目录操作 | [02-Linux文件与目录操作.md](notes/Linux基础/02-Linux文件与目录操作.md) | ✅ |
 
 ### 第二阶段：开发工具
 
 | 序号 | 主题 | 文件 | 状态 |
 |------|------|------|------|
-| 03 | Vim编辑器 | [03-Vim编辑器.md](notes/03-Vim编辑器.md) | ✅ |
+| 03 | Vim编辑器 | [03-Vim编辑器.md](notes/Linux基础/03-Vim编辑器.md) | ✅ |
 
 ### 第三阶段：C语言编程
 
 | 序号 | 主题 | 文件 | 章节数 | 状态 |
 |------|------|------|--------|------|
-| 04 | C语言基础 | [04-C语言基础.md](notes/04-C语言基础.md) | 30章 | ✅ |
+| 04 | C语言基础 | [04-C语言基础.md](notes/C语言/04-C语言基础.md) | 30章 | ✅ |
 
 涵盖：数据类型、运算符、位运算、流程控制、函数、递归、数组、指针（多级/数组/函数指针）、字符串、结构体、共用体、枚举、动态内存、内存布局、修饰符（static/const/volatile等）、预处理、Makefile、静态库/动态库、VT码、文件IO、容错处理
 
@@ -29,7 +29,7 @@
 
 | 序号 | 主题 | 文件 | 章节数 | 状态 |
 |------|------|------|--------|------|
-| 05 | 数据结构 | [05-数据结构.md](notes/05-数据结构.md) | 13章 | ✅ |
+| 05 | 数据结构 | [05-数据结构.md](notes/数据结构/05-数据结构.md) | 13章 | ✅ |
 
 涵盖：
 
@@ -51,17 +51,21 @@
 
 | 序号 | 主题 | 文件 | 章节数 | 状态 |
 |------|------|------|--------|------|
-| 06 | Linux系统编程 | [06-Linux系统编程.md](notes/06-Linux系统编程.md) | 38章 | ✅ |
+| 06 | Linux系统编程 | [06-Linux系统编程.md](notes/Linux系统编程/06-Linux系统编程.md) | 38章 | ✅ |
+| 07 | Linux网络编程 | [07-Linux网络编程.md](notes/Linux系统编程/07-Linux网络编程.md) | 15章 | ✅ |
 
-涵盖：kernel五大子系统、sys IO（open/close/read/write/lseek/dup/fcntl）、文件权限与特殊权限位（SUID/SGID/Sticky）、stat文件属性与类型检测、用户与组信息（getpwuid/crypt）、时间函数、文件系统与目录操作（readlink/chmod/chdir/opendir/tree）、进程（fork/vfork/exit/wait/孤儿/僵尸/守护/进程组/资源限制）、信号（kill/signal/alarm/setitimer+定时器链表）、exec族函数、匿名管道pipe、有名管道fifo（tell聊天）、IPC（消息队列/共享内存/信号量）、线程（创建/数据共享/退出等待/互斥锁/清理函数）
+涵盖：kernel五大子系统、sys IO（open/close/read/write/lseek/dup/fcntl）、文件权限与特殊权限位（SUID/SGID/Sticky）、stat文件属性与类型检测、用户与组信息（getpwuid/crypt）、时间函数、文件系统与目录操作（readlink/chmod/chdir/opendir/tree）、进程（fork/vfork/exit/wait/孤儿/僵尸/守护/进程组/资源限制）、信号（kill/signal/alarm/setitimer+定时器链表）、exec族函数、匿名管道pipe、有名管道fifo（tell聊天）、IPC（消息队列/共享内存/信号量）、线程（创建/数据共享/退出等待/互斥锁/清理函数）、OSI七层/TCP-IP四层、大小端与网络字节序、以太网帧、TCP/UDP、三次握手/四次挥手、Socket编程（socket/connect/bind/listen/accept/sendto/recvfrom）、多进程并发服务器、TCP/UDP文件传输、广播/多播/组播、IO复用（select）
 
-### 第六阶段：网络编程
+### 第六阶段：C++编程
 
-| 序号 | 主题 | 文件 | 章节数 | 状态 |
-|------|------|------|--------|------|
-| 07 | Linux网络编程 | [07-Linux网络编程.md](notes/07-Linux网络编程.md) | 15章 | ✅ |
+| 序号 | 主题 | 文件 | 状态 |
+|------|------|------|------|
+| 08 | C++基础入门 | [01-C++基础入门.md](notes/C++/01-C++基础入门/01-C++基础入门.md) | ✅ |
+| 09 | C++核心编程 | [02-C++核心编程.md](notes/C++/02-C++核心编程/02-C++核心编程.md) | ✅ |
+| 10 | C++提高编程 | [03-C++提高编程.md](notes/C++/03-C++提高编程/03-C++提高编程.md) | ✅ |
+| 11 | 实战项目集 | [04-实战项目集.md](notes/C++/04-实战项目集/04-实战项目集.md) | ✅ |
 
-涵盖：OSI七层参考模型、TCP/IP四层模型、大小端与网络字节序、以太网帧格式、TCP vs UDP、IP地址与ARP/RARP/ping、TCP三次握手/四次挥手、Socket编程（socket/connect/bind/listen/accept）、字节序转换（htonl/htons）、IP转换（inet_addr/inet_ntoa）、TCP数据传输（send/recv）、多进程并发服务器（fork+accept）、TCP文件传输、TCP版tell聊天（VT码分屏）、UDP编程（sendto/recvfrom）、广播（SO_BROADCAST）、多播/组播（IP_ADD_MEMBERSHIP/D类地址）、IO复用（select/FD_SET/FD_ISSET）
+涵盖：C++基础语法（数据类型/运算符/流程控制/数组/函数/指针/结构体/通讯录管理系统）、C++核心（内存分区模型/引用/函数提高/类与对象封装继承多态/文件操作/职工管理系统）、C++提高（模板/STL容器/函数对象/算法/演讲比赛系统）、实战项目（通讯录/职工管理/演讲比赛/机房预约）
 
 ### 第七阶段：嵌入式开发
 *（待学习）*
@@ -77,7 +81,7 @@ C语言基础           ██████████████████�
 数据结构            ████████████████████ 100%
 Linux系统编程       ████████████████████ 100%
 Linux网络编程       ████████████████████ 100%
-
+C++编程             ████████████████████ 100%
 ```
 
 ## 学习资源
